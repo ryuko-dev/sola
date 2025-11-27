@@ -1,6 +1,6 @@
 "use client"
 import { useState } from "react"
-import type { Project, Position } from "./allocation-grid"
+import type { Project, Position } from "../lib/types"
 
 interface ProjectManagerProps {
   projects: Project[]
@@ -12,11 +12,16 @@ interface ProjectManagerProps {
   onUpdateProject: (projectId: string, updates: Partial<Project>) => void
   onDeleteProject: (projectId: string) => void
   onUpdatePositions: (positions: Position[]) => void
+  onProjectSelect?: (projectId: string | null) => void
+  selectedProjectId?: string | null
+  onCleanupAllocations?: (projectId: string, validPositionIds: string[]) => void
+  currentUserRole?: 'admin' | 'editor' | 'viewer' | null
 }
 
 interface PositionBudget {
   id: string
   name: string
+  projectTask?: string
   budgets: Record<number, number>
 }
 
@@ -30,6 +35,10 @@ export function ProjectManager({
   onUpdateProject,
   onDeleteProject,
   onUpdatePositions,
+  onProjectSelect,
+  selectedProjectId,
+  onCleanupAllocations,
+  currentUserRole,
 }: ProjectManagerProps) {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null)
@@ -41,6 +50,10 @@ export function ProjectManager({
   const [projectEndMonth, setProjectEndMonth] = useState(0)
   const [projectEndYear, setProjectEndYear] = useState(2024)
   const [monthTablePage, setMonthTablePage] = useState(0)
+  const [allocationMode, setAllocationMode] = useState<'percentage' | 'days'>('percentage')
+
+  // Check if current user can edit projects
+  const canEditProjects = currentUserRole === 'admin' || currentUserRole === 'editor'
 
   const MONTHS = [
     "January",
@@ -57,6 +70,32 @@ export function ProjectManager({
     "December",
   ]
   const YEARS = Array.from({ length: 10 }, (_, i) => 2024 + i)
+
+  // Helper to calculate working days in a month
+  const getWorkingDaysInMonth = (year: number, month: number, startDay: number = 1): number => {
+    const date = new Date(year, month, 1)
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    let workingDays = 0
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+      date.setDate(day)
+      const dayOfWeek = date.getDay() // 0 = Sunday, 6 = Saturday
+      
+      if (startDay === 1) {
+        // Monday to Friday (1-5)
+        if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+          workingDays++
+        }
+      } else {
+        // Sunday to Thursday (0-4)
+        if (dayOfWeek >= 0 && dayOfWeek <= 4) {
+          workingDays++
+        }
+      }
+    }
+    
+    return workingDays
+  }
 
   const COLORS = [
     "#3B82F6", // Blue
@@ -111,6 +150,13 @@ export function ProjectManager({
   const handleCreateProject = () => {
     if (!newProjectName.trim()) return
 
+    console.log('[DEBUG] Creating project with dates:', {
+      projectStartMonth,
+      projectStartYear,
+      projectEndMonth,
+      projectEndYear
+    })
+
     const newProject: Project = {
       id: `proj-${Date.now()}`,
       name: newProjectName,
@@ -119,7 +165,10 @@ export function ProjectManager({
       startYear: projectStartYear,
       endMonth: projectEndMonth,
       endYear: projectEndYear,
+      allocationMode,
     }
+
+    console.log('[DEBUG] Project object being created:', newProject)
 
     onAddProject(newProject)
 
@@ -131,14 +180,17 @@ export function ProjectManager({
       displayMonths.forEach((displayMonth, displayIdx) => {
         const percentage = positionBudget.budgets[displayMonth.globalIndex] || 0
         if (percentage > 0) {
-          newPositions.push({
+          const position: Position = {
             id: `pos-${newProject.id}-${positionBudget.id}-${displayMonth.globalIndex}`,
             projectId: newProject.id,
             monthIndex: displayMonth.globalIndex,
-            percentage,
+            percentage: allocationMode === 'days' ? (percentage / getWorkingDaysInMonth(displayMonth.year, displayMonth.month, 1)) * 100 : percentage,
             allocated: 0,
             name: positionBudget.name,
-          })
+            projectTask: positionBudget.projectTask,
+            days: allocationMode === 'days' ? percentage : undefined,
+          }
+          newPositions.push(position)
         }
       })
     })
@@ -155,6 +207,7 @@ export function ProjectManager({
     setProjectEndMonth(0)
     setProjectEndYear(2024)
     setMonthTablePage(0)
+    setAllocationMode('percentage')
     setShowCreateModal(false)
   }
 
@@ -168,6 +221,7 @@ export function ProjectManager({
       setProjectStartYear(project.startYear ?? 2024)
       setProjectEndMonth(project.endMonth ?? 0)
       setProjectEndYear(project.endYear ?? 2024)
+      setAllocationMode(project.allocationMode ?? 'percentage')
       setMonthTablePage(0)
 
       const projectPositions = positions.filter((p) => p.projectId === projectId)
@@ -179,11 +233,14 @@ export function ProjectManager({
           positionMap.set(name, {
             id: `${name}-${Date.now()}`,
             name,
+            projectTask: p.projectTask,
             budgets: {},
           })
         }
         const pos = positionMap.get(name)!
-        pos.budgets[p.monthIndex] = p.percentage
+        // Use days if available, otherwise use percentage
+        const value = project.allocationMode === 'days' && p.days ? p.days : p.percentage
+        pos.budgets[p.monthIndex] = value
       })
 
       setPositionBudgets(Array.from(positionMap.values()))
@@ -193,15 +250,23 @@ export function ProjectManager({
   const handleSaveEditProject = () => {
     if (!editingProjectId || !newProjectName.trim()) return
 
+    const projectId = editingProjectId // Store before clearing state
+
     console.log("[v0] Saving project with dates:", {
-      projectId: editingProjectId,
+      projectId,
       startMonth: projectStartMonth,
       startYear: projectStartYear,
       endMonth: projectEndMonth,
       endYear: projectEndYear,
     })
 
-    onUpdateProject(editingProjectId, {
+    console.log("[v0] Saving project with color:", {
+      projectId,
+      selectedColor,
+    })
+
+    console.log("[v0] About to call onUpdateProject with:", {
+      projectId,
       name: newProjectName,
       color: selectedColor,
       startMonth: projectStartMonth,
@@ -210,32 +275,58 @@ export function ProjectManager({
       endYear: projectEndYear,
     })
 
-    const existingPositions = positions.filter((p) => p.projectId === editingProjectId)
+    // Update positions BEFORE updating the project to avoid triggering another project update
+    const existingPositions = positions.filter((p) => p.projectId === projectId)
     const newPositions: Position[] = []
 
     positionBudgets.forEach((positionBudget) => {
       displayMonths.forEach((displayMonth) => {
-        const percentage = positionBudget.budgets[displayMonth.globalIndex] || 0
-        if (percentage > 0) {
+        const value = positionBudget.budgets[displayMonth.globalIndex] || 0
+        if (value > 0) {
           const existingPos = existingPositions.find(
             (p) => p.monthIndex === displayMonth.globalIndex && p.name === positionBudget.name,
           )
-          newPositions.push({
-            id: `pos-${editingProjectId}-${positionBudget.id}-${displayMonth.globalIndex}`,
-            projectId: editingProjectId,
+          const project = projects.find((p) => p.id === projectId)
+          const mode = project?.allocationMode || 'percentage'
+          
+          const position: Position = {
+            id: existingPos?.id || `pos-${projectId}-${positionBudget.id}-${displayMonth.globalIndex}`,
+            projectId,
             monthIndex: displayMonth.globalIndex,
-            percentage,
+            percentage: mode === 'days' ? (value / getWorkingDaysInMonth(displayMonth.year, displayMonth.month, 1)) * 100 : value,
             allocated: existingPos?.allocated || 0,
             name: positionBudget.name,
-          })
+            projectTask: positionBudget.projectTask,
+            days: mode === 'days' ? value : undefined,
+          }
+          newPositions.push(position)
         }
       })
     })
 
-    const otherPositions = positions.filter((p) => p.projectId !== editingProjectId)
+    const otherPositions = positions.filter((p) => p.projectId !== projectId)
     onUpdatePositions([...otherPositions, ...newPositions])
 
+    // Clean up allocations for removed positions
+    if (onCleanupAllocations) {
+      const validPositionIds = newPositions.map(p => p.id)
+      onCleanupAllocations(projectId, validPositionIds)
+    }
+
+    // Now update the project
+    onUpdateProject(projectId, {
+      name: newProjectName,
+      color: selectedColor,
+      startMonth: projectStartMonth,
+      startYear: projectStartYear,
+      endMonth: projectEndMonth,
+      endYear: projectEndYear,
+      allocationMode,
+    })
+
+    // Close the edit modal immediately so the project list re-renders with the new color
     setEditingProjectId(null)
+
     setNewProjectName("")
     setSelectedColor("#3B82F6")
     setPositionBudgets([])
@@ -244,6 +335,7 @@ export function ProjectManager({
     setProjectEndMonth(0)
     setProjectEndYear(2024)
     setMonthTablePage(0)
+    setAllocationMode('percentage')
   }
 
   const handleAddPositionLine = () => {
@@ -265,33 +357,185 @@ export function ProjectManager({
     setPositionBudgets(positionBudgets.map((p) => (p.id === id ? { ...p, name } : p)))
   }
 
+  const handleUpdateProjectTask = (id: string, projectTask: string) => {
+    setPositionBudgets(positionBudgets.map((p) => (p.id === id ? { ...p, projectTask } : p)))
+  }
+
   const handleUpdatePositionBudget = (id: string, globalMonthIndex: number, value: number) => {
     setPositionBudgets(
       positionBudgets.map((p) => (p.id === id ? { ...p, budgets: { ...p.budgets, [globalMonthIndex]: value } } : p)),
     )
   }
 
+  const exportPositionsToExcel = () => {
+    if (positionBudgets.length === 0) {
+      alert("No positions to export")
+      return
+    }
+
+    let csvContent = ""
+    
+    // Create header row with project task, position name and all months
+    const headerRow = ["Project Task", "Position Name", ...displayMonths.map(m => m.displayName)]
+    csvContent += headerRow.join(",") + "\n"
+    
+    // Add data rows for each position (only include positions with names)
+    positionBudgets
+      .filter(p => p.name.trim() !== "")
+      .forEach(position => {
+        const row = [position.projectTask || "", position.name]
+        displayMonths.forEach(month => {
+          const value = position.budgets[month.globalIndex] || 0
+          row.push(value.toString())
+        })
+        csvContent += row.join(",") + "\n"
+      })
+    
+    // Create and download the file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    
+    const projectName = newProjectName || "Project"
+    const fileName = `${projectName}-positions-${allocationMode}-${new Date().toISOString().split('T')[0]}.csv`
+    link.setAttribute('href', url)
+    link.setAttribute('download', fileName)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const importPositionsFromExcel = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string
+        const lines = text.split('\n').filter(line => line.trim())
+        
+        if (lines.length < 2) {
+          alert("File must contain at least a header row and one data row")
+          return
+        }
+
+        // Parse header row to get months
+        const headers = lines[0].split(',').map(h => h.trim())
+        const monthHeaders = headers.slice(2) // Remove "Project Task" and "Position Name"
+        
+        // Parse data rows
+        const importedPositions: PositionBudget[] = []
+        
+        for (let i = 1; i < lines.length; i++) {
+          const values = lines[i].split(',').map(v => v.trim())
+          if (values.length < 3 || !values[1]) continue // Skip empty rows
+          
+          const projectTask = values[0]
+          const positionName = values[1]
+          const budgets: Record<number, number> = {}
+          
+          // Map values to months
+          values.slice(2).forEach((value, index) => {
+            if (index < displayMonths.length) {
+              const numValue = parseFloat(value) || 0
+              budgets[displayMonths[index].globalIndex] = numValue
+            }
+          })
+          
+          importedPositions.push({
+            id: `imported-${positionName}-${Date.now()}-${i}`,
+            name: positionName,
+            projectTask,
+            budgets
+          })
+        }
+        
+        if (importedPositions.length > 0) {
+          if (positionBudgets.some(p => p.name.trim() !== "")) {
+            const confirmReplace = confirm(
+              `Import will replace existing positions with ${importedPositions.length} imported positions. Continue?`
+            )
+            if (!confirmReplace) return
+          }
+          
+          // Update the positionBudgets state for the table display
+          setPositionBudgets(importedPositions)
+          
+          alert(`Successfully imported ${importedPositions.length} positions`)
+        } else {
+          alert("No valid position data found in file")
+        }
+      } catch (error) {
+        console.error('Import error:', error)
+        alert("Error importing file. Please check the file format and try again.")
+      }
+    }
+    
+    reader.onerror = () => {
+      alert("Error reading file")
+    }
+    
+    reader.readAsText(file)
+    
+    // Reset the file input
+    if (event.target) {
+      event.target.value = ''
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap gap-4 items-center">
-        {projects.map((project) => (
-          <div key={project.id} className="flex items-center gap-3 px-4 py-2 rounded bg-muted border border-border">
-            <div className="w-3 h-3 rounded" style={{ backgroundColor: project.color }} />
-            <span className="text-sm font-medium text-foreground">{project.name}</span>
-            <button
-              onClick={() => handleEditProject(project.id)}
-              className="ml-2 px-2 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
+        {projects.map((project) => {
+          // Determine if text should be white or black based on background color brightness
+          const getContrastColor = (hex: string) => {
+            const r = parseInt(hex.slice(1, 3), 16)
+            const g = parseInt(hex.slice(3, 5), 16)
+            const b = parseInt(hex.slice(5, 7), 16)
+            const brightness = (r * 299 + g * 587 + b * 114) / 1000
+            return brightness > 128 ? "#000" : "#fff"
+          }
+          const textColor = getContrastColor(project.color)
+          
+          return (
+            <div
+              key={project.id}
+              className={`flex items-center justify-between px-3 py-1.5 rounded border border-border cursor-pointer hover:opacity-80 transition-opacity w-32 h-8 ${
+                selectedProjectId === project.id ? 'ring-2 ring-offset-2 ring-blue-500' : ''
+              }`}
+              style={{ backgroundColor: project.color, color: textColor }}
+              onClick={() => {
+                if (onProjectSelect) {
+                  onProjectSelect(selectedProjectId === project.id ? null : project.id)
+                }
+              }}
             >
-              Edit
-            </button>
-          </div>
-        ))}
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded font-medium hover:bg-primary/90 transition-colors text-sm"
-        >
-          + New Project
-        </button>
+              <span className="text-xs font-medium truncate flex-1">{project.name}</span>
+              {canEditProjects && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleEditProject(project.id)
+                  }}
+                  className="px-1.5 py-0.5 text-[10px] bg-white/20 rounded hover:bg-white/30 transition-colors flex-shrink-0"
+                  style={{ color: textColor }}
+                >
+                  Edit
+                </button>
+              )}
+            </div>
+          )
+        })}
+        {canEditProjects && (
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded font-medium hover:bg-primary/90 transition-colors text-sm"
+          >
+            + New Project
+          </button>
+        )}
       </div>
 
       {(showCreateModal || editingProjectId) && (
@@ -308,8 +552,9 @@ export function ProjectManager({
                   type="text"
                   value={newProjectName}
                   onChange={(e) => setNewProjectName(e.target.value)}
-                  className="border border-border rounded px-3 py-2 w-full text-sm bg-background text-foreground"
+                  className="w-full px-3 py-2 border border-border rounded text-foreground bg-card"
                   placeholder="Enter project name"
+                  disabled={!canEditProjects}
                   autoFocus
                 />
               </div>
@@ -320,13 +565,46 @@ export function ProjectManager({
                   {COLORS.map((color) => (
                     <button
                       key={color}
-                      onClick={() => setSelectedColor(color)}
+                      onClick={() => {
+                        console.log("[v0] Color picker clicked, setting color to:", color)
+                        setSelectedColor(color)
+                      }}
                       className={`w-8 h-8 rounded transition-all ${selectedColor === color ? "ring-2 ring-offset-2 ring-primary" : "hover:opacity-80"}`}
                       style={{ backgroundColor: color }}
                       title={color}
                     />
                   ))}
                 </div>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <label className="text-xs font-medium text-muted-foreground mb-2 block">Allocation Mode</label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="allocationMode"
+                    value="percentage"
+                    checked={allocationMode === 'percentage'}
+                    onChange={(e) => setAllocationMode('percentage')}
+                    className="text-primary"
+                    disabled={!canEditProjects}
+                  />
+                  <span className="text-sm">% Allocation</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="allocationMode"
+                    value="days"
+                    checked={allocationMode === 'days'}
+                    onChange={(e) => setAllocationMode('days')}
+                    className="text-primary"
+                    disabled={!canEditProjects}
+                  />
+                  <span className="text-sm">Day Allocation</span>
+                </label>
               </div>
             </div>
 
@@ -337,6 +615,7 @@ export function ProjectManager({
                   value={projectStartMonth}
                   onChange={(e) => setProjectStartMonth(Number(e.target.value))}
                   className="border border-border rounded px-3 py-2 w-full text-sm bg-background text-foreground"
+                  disabled={!canEditProjects}
                 >
                   {MONTHS.map((month, idx) => (
                     <option key={idx} value={idx}>
@@ -352,6 +631,7 @@ export function ProjectManager({
                   value={projectStartYear}
                   onChange={(e) => setProjectStartYear(Number(e.target.value))}
                   className="border border-border rounded px-3 py-2 w-full text-sm bg-background text-foreground"
+                  disabled={!canEditProjects}
                 >
                   {YEARS.map((year) => (
                     <option key={year} value={year}>
@@ -367,6 +647,7 @@ export function ProjectManager({
                   value={projectEndMonth}
                   onChange={(e) => setProjectEndMonth(Number(e.target.value))}
                   className="border border-border rounded px-3 py-2 w-full text-sm bg-background text-foreground"
+                  disabled={!canEditProjects}
                 >
                   {MONTHS.map((month, idx) => (
                     <option key={idx} value={idx}>
@@ -382,6 +663,7 @@ export function ProjectManager({
                   value={projectEndYear}
                   onChange={(e) => setProjectEndYear(Number(e.target.value))}
                   className="border border-border rounded px-3 py-2 w-full text-sm bg-background text-foreground"
+                  disabled={!canEditProjects}
                 >
                   {YEARS.map((year) => (
                     <option key={year} value={year}>
@@ -395,7 +677,7 @@ export function ProjectManager({
             <div className="mb-6">
               <div className="flex justify-between items-center mb-2">
                 <label className="text-xs font-medium text-muted-foreground">
-                  Positions by Month (%) - Page {monthTablePage + 1} of {maxPages}
+                  Positions by Month ({allocationMode === 'days' ? 'Days' : '%'}) - Page {monthTablePage + 1} of {maxPages}
                 </label>
                 <div className="flex gap-2 items-center">
                   <button
@@ -415,16 +697,43 @@ export function ProjectManager({
                   <button
                     onClick={handleAddPositionLine}
                     className="px-3 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
+                    disabled={!canEditProjects}
                   >
                     + Add Position
                   </button>
+                  <button
+                    onClick={exportPositionsToExcel}
+                    className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                    title="Export positions to Excel"
+                  >
+                    📥 Export
+                  </button>
+                  <button
+                    onClick={() => document.getElementById('excel-import-input')?.click()}
+                    className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                    title="Import positions from Excel"
+                    disabled={!canEditProjects}
+                  >
+                    📤 Import
+                  </button>
+                  <input
+                    id="excel-import-input"
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={importPositionsFromExcel}
+                    style={{ display: 'none' }}
+                    disabled={!canEditProjects}
+                  />
                 </div>
               </div>
               <div className="border border-border rounded overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-[10px]">
                   <thead className="bg-muted border-b border-border">
                     <tr>
-                      <th className="px-4 py-2 text-left font-semibold text-muted-foreground min-w-32">
+                      <th className="px-4 py-2 text-left font-semibold text-muted-foreground min-w-20">
+                        Project Task
+                      </th>
+                      <th className="px-4 py-2 text-left font-semibold text-muted-foreground min-w-40">
                         Position Name
                       </th>
                       {displayMonths.map((displayMonth) => (
@@ -441,7 +750,7 @@ export function ProjectManager({
                   <tbody>
                     {positionBudgets.length === 0 ? (
                       <tr>
-                        <td colSpan={displayMonths.length + 2} className="px-4 py-8 text-center text-muted-foreground">
+                        <td colSpan={displayMonths.length + 3} className="px-4 py-8 text-center text-muted-foreground">
                           No positions yet. Click "Add Position" to create one.
                         </td>
                       </tr>
@@ -451,10 +760,21 @@ export function ProjectManager({
                           <td className="px-4 py-2 border-r border-border">
                             <input
                               type="text"
+                              value={positionBudget.projectTask || ""}
+                              onChange={(e) => handleUpdateProjectTask(positionBudget.id, e.target.value)}
+                              className="w-full px-2 py-1 border border-border rounded text-foreground bg-card"
+                              placeholder="e.g., 01.03.01"
+                              disabled={!canEditProjects}
+                            />
+                          </td>
+                          <td className="px-4 py-2 border-r border-border">
+                            <input
+                              type="text"
                               value={positionBudget.name}
                               onChange={(e) => handleUpdatePositionName(positionBudget.id, e.target.value)}
                               className="w-full px-2 py-1 border border-border rounded text-foreground bg-card"
                               placeholder="e.g., Senior Developer"
+                              disabled={!canEditProjects}
                             />
                           </td>
                           {displayMonths.map((displayMonth) => (
@@ -465,7 +785,7 @@ export function ProjectManager({
                               <input
                                 type="number"
                                 min="0"
-                                max="999"
+                                max={allocationMode === 'days' ? getWorkingDaysInMonth(displayMonth.year, displayMonth.month, 1) : 999}
                                 value={positionBudget.budgets[displayMonth.globalIndex] || ""}
                                 onChange={(e) =>
                                   handleUpdatePositionBudget(
@@ -475,7 +795,8 @@ export function ProjectManager({
                                   )
                                 }
                                 className="w-full px-2 py-1 text-center border border-border rounded text-foreground bg-card"
-                                placeholder="0"
+                                placeholder={allocationMode === 'days' ? `0-${getWorkingDaysInMonth(displayMonth.year, displayMonth.month, 1)} days` : "0%"}
+                                disabled={!canEditProjects}
                               />
                             </td>
                           ))}
@@ -483,6 +804,7 @@ export function ProjectManager({
                             <button
                               onClick={() => handleDeletePositionLine(positionBudget.id)}
                               className="px-2 py-1 text-xs bg-destructive text-destructive-foreground rounded hover:bg-destructive/90 transition-colors"
+                              disabled={!canEditProjects}
                             >
                               ✕
                             </button>
@@ -508,6 +830,7 @@ export function ProjectManager({
                   setProjectEndMonth(0)
                   setProjectEndYear(2024)
                   setMonthTablePage(0)
+                  setAllocationMode('percentage')
                 }}
                 className="px-4 py-2 bg-muted text-muted-foreground rounded font-medium hover:bg-muted/80 transition-colors text-sm"
               >
@@ -529,9 +852,10 @@ export function ProjectManager({
                       setProjectEndMonth(0)
                       setProjectEndYear(2024)
                       setMonthTablePage(0)
+                      setAllocationMode('percentage')
                     }
                   }}
-                  className="px-4 py-2 bg-destructive text-destructive-foreground rounded font-medium hover:bg-destructive/90 transition-colors text-sm"
+                  className="px-4 py-2 bg-destructive text-black rounded font-medium hover:bg-destructive/90 transition-colors text-sm"
                 >
                   Delete Project
                 </button>
@@ -539,6 +863,7 @@ export function ProjectManager({
               <button
                 onClick={editingProjectId ? handleSaveEditProject : handleCreateProject}
                 className="px-4 py-2 bg-primary text-primary-foreground rounded font-medium hover:bg-primary/90 transition-colors text-sm"
+                disabled={!canEditProjects}
               >
                 {editingProjectId ? "Save Changes" : "Create Project"}
               </button>

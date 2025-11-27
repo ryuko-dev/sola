@@ -7,21 +7,31 @@ export interface Project {
   startYear?: number
   endMonth?: number
   endYear?: number
+  allocationMode?: 'percentage' | 'days' // Allocation mode for positions
 }
 
 export interface Position {
   id: string
   projectId: string
   monthIndex: number
-  percentage: number
+  percentage: number // Still stored as percentage for compatibility
   allocated: number
   name?: string
+  projectTask?: string
+  days?: number // Optional days field for day allocation mode
 }
 
 export interface User {
   id: string
   name: string
   department: string
+  entity?: string    // Entity/organization assignment
+  startDate?: string // ISO date string (YYYY-MM-DD)
+  endDate?: string   // ISO date string (YYYY-MM-DD), undefined = no end date
+  workDays?: 'mon-fri' | 'sun-thu' // Work week pattern, defaults to mon-fri
+  role?: 'admin' | 'editor' | 'viewer'
+  email?: string     // For login system
+  isActive?: boolean // For user management
 }
 
 export interface Allocation {
