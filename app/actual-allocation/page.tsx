@@ -53,6 +53,7 @@ export default function ActualAllocationPage() {
   const [currentUser, setCurrentUser] = React.useState<string | null>(null)
   const [users, setUsers] = React.useState<UserExtended[]>([])
   const [projects, setProjects] = React.useState<any[]>([])
+  const [entities, setEntities] = React.useState<any[]>([])
   const [selectedMonth, setSelectedMonth] = React.useState<number>(new Date().getMonth())
   const [selectedYear, setSelectedYear] = React.useState<number>(new Date().getFullYear())
   const [isLocked, setIsLocked] = React.useState<boolean>(false)
@@ -83,11 +84,12 @@ export default function ActualAllocationPage() {
     // Load projects
     setProjects(userData.projects || [])
     
-    // Load lock state (only admin can change it)
-    if (systemUser.role === 'admin') {
-      const savedLockState = localStorage.getItem(`sola-lock-state-${user}`)
-      setIsLocked(savedLockState === 'true')
-    }
+    // Load entities for account codes
+    setEntities(userData.entities || [])
+    
+    // Load month-specific lock state (applies to all users)
+    const savedLockState = localStorage.getItem(`sola-lock-state-${monthKey}`)
+    setIsLocked(savedLockState === 'true')
     
     // Initialize monthly allocation items
     const savedMonthlyAllocation = localStorage.getItem(`sola-monthly-allocation-${user}-${monthKey}`)
@@ -178,12 +180,17 @@ export default function ActualAllocationPage() {
     const newLockState = !isLocked
     setIsLocked(newLockState)
     
-    // Save lock state to localStorage
-    const user = getCurrentUser()
-    if (user) {
-      localStorage.setItem(`sola-lock-state-${user}`, newLockState.toString())
-    }
+    // Save month-specific lock state to localStorage (applies to all users)
+    const monthKey = `${selectedYear}-${selectedMonth}`
+    localStorage.setItem(`sola-lock-state-${monthKey}`, newLockState.toString())
   }
+
+  // Reload lock state when month/year changes
+  React.useEffect(() => {
+    const monthKey = `${selectedYear}-${selectedMonth}`
+    const savedLockState = localStorage.getItem(`sola-lock-state-${monthKey}`)
+    setIsLocked(savedLockState === 'true')
+  }, [selectedMonth, selectedYear])
 
   // Recalculate working days when month/year changes
   React.useEffect(() => {
@@ -400,118 +407,247 @@ export default function ActualAllocationPage() {
     })
   }
 
-  // Group users by entity
-  const groupedByEntity = users.reduce((acc: Record<string, UserExtended[]>, user: UserExtended) => {
-    const entity = user.entity || "Unassigned"
-    if (!acc[entity]) {
-      acc[entity] = []
-    }
-    acc[entity].push(user)
-    return acc
-  }, {} as Record<string, UserExtended[]>)
+  // Helper to check if user has ended by a given month
+  const isUserEndedInMonth = (user: UserExtended, month: number, year: number): boolean => {
+    if (!user?.endDate) return false
+    
+    const end = new Date(user.endDate)
+    if (Number.isNaN(end.getTime())) return false
+    
+    const endMonth = end.getMonth() // 0-11
+    const endYear = end.getFullYear()
+    
+    // User has ended if selected month/year is after their end date
+    return (year > endYear) || (year === endYear && month > endMonth)
+  }
+  
+  // Helper to check if user has started by a given month
+  const isUserStartedInMonth = (user: UserExtended, month: number, year: number): boolean => {
+    if (!user?.startDate) return true // No start date means they've always been active
+    
+    const start = new Date(user.startDate)
+    if (Number.isNaN(start.getTime())) return true
+    
+    const startMonth = start.getMonth() // 0-11
+    const startYear = start.getFullYear()
+    
+    // User has started if selected month/year is on or after their start date
+    return (year > startYear) || (year === startYear && month >= startMonth)
+  }
+
+  // Helper to check if user is active in selected month
+  const isUserActiveInSelectedMonth = (user: UserExtended): boolean => {
+    return isUserStartedInMonth(user, selectedMonth, selectedYear) && 
+           !isUserEndedInMonth(user, selectedMonth, selectedYear)
+  }
+
+  // Group users by entity (only include users active in selected month)
+  const groupedByEntity = users
+    .filter(user => isUserActiveInSelectedMonth(user))
+    .reduce((acc: Record<string, UserExtended[]>, user: UserExtended) => {
+      const entity = user.entity || "Unassigned"
+      if (!acc[entity]) {
+        acc[entity] = []
+      }
+      acc[entity].push(user)
+      return acc
+    }, {} as Record<string, UserExtended[]>)
 
   const activeProjects = getActiveProjects()
 
   // Filter monthly allocation rows based on main table amounts and update currency and auto-calculate amounts
-  const filteredMonthlyAllocation = monthlyAllocation.flatMap(item => {
-    const user = users.find(u => u.id === item.name || u.name === item.name)
-    if (!user) return []
-    
-    const monthKey = `${selectedYear}-${selectedMonth}`
-    const payrollData = user.payrollDataByMonth?.[monthKey]
-    const fringeData = user.fringeDataByMonth?.[monthKey]
-    const projectData = user.projectDataByMonth?.[monthKey] || {}
-    
-    // Calculate total project hours for percentage calculation
-    const totalProjectHours = activeProjects.reduce((total, project) => total + (projectData[project.id] || 0), 0)
-    
-    // Calculate amount based on account type
-    let calculatedAmount = 0
-    const dailyRate = payrollData?.netSalary && fringeData?.workingDays ? payrollData.netSalary / fringeData.workingDays : 0
-    const leaveDeduction = ((fringeData?.annualLeave || 0) + (fringeData?.sickLeave || 0) + (fringeData?.publicHolidays || 0)) * dailyRate
-    const netSalaryForProjects = (payrollData?.netSalary || 0) - leaveDeduction
-    const fringeBenefitAmount = leaveDeduction
-    
-    // Get base amount for this account type
-    let baseAmount = 0
-    switch (item.account) {
-      case 'Net Salary [631 0001]':
-        baseAmount = netSalaryForProjects
-        break
-      case 'Social Security [635 1001]':
-        baseAmount = payrollData?.socialSecurity || 0
-        break
-      case 'Employee Tax [620 1005]':
-        baseAmount = payrollData?.employeeTax || 0
-        break
-      case 'Employer Tax [620 1005]':
-        baseAmount = payrollData?.employerTax || 0
-        break
-      case 'Housing [635 4001]':
-        baseAmount = payrollData?.housing || 0
-        break
-      case 'Other Benefits [602 4001]':
-        baseAmount = payrollData?.otherBenefits || 0
-        break
-      case 'Fringe Benefit - Leave [631 0001]':
-        baseAmount = fringeBenefitAmount
-        break
-      default:
-        baseAmount = 0
-    }
-    
-    // Create rows for each project that has allocated hours
-    const projectRows: MonthlyAllocationItem[] = []
-    if (totalProjectHours > 0 && baseAmount > 0) {
-      activeProjects.forEach(project => {
-        const projectHours = projectData[project.id] || 0
-        if (projectHours > 0) {
-          const projectPercentage = (projectHours / totalProjectHours) * 100
-          const calculatedAmount = baseAmount * projectPercentage / 100
-          
-          projectRows.push({
-            ...item,
-            id: `${item.id}-${project.id}`,
-            currency: payrollData?.currency || 'USD',
-            amount: parseFloat(calculatedAmount.toFixed(2)),
-            project: project.name
-          })
+  const filteredMonthlyAllocation = React.useMemo(() => {
+    const existingAllocationRows = monthlyAllocation.flatMap(item => {
+      const user = users.find(u => u.id === item.name || u.name === item.name)
+      if (!user) return []
+      
+      const monthKey = `${selectedYear}-${selectedMonth}`
+      const payrollData = user.payrollDataByMonth?.[monthKey]
+      const fringeData = user.fringeDataByMonth?.[monthKey]
+      const projectData = user.projectDataByMonth?.[monthKey] || {}
+      
+      // Calculate total project hours for percentage calculation
+      const totalProjectHours = activeProjects.reduce((total, project) => total + (projectData[project.id] || 0), 0)
+      
+      // Calculate amount based on account type
+      let calculatedAmount = 0
+      const dailyRate = payrollData?.netSalary && fringeData?.workingDays ? payrollData.netSalary / fringeData.workingDays : 0
+      const leaveDeduction = ((fringeData?.annualLeave || 0) + (fringeData?.sickLeave || 0) + (fringeData?.publicHolidays || 0)) * dailyRate
+      const netSalaryForProjects = (payrollData?.netSalary || 0) - leaveDeduction
+      const fringeBenefitAmount = leaveDeduction
+      
+      // Get base amount for this account type
+      let baseAmount = 0
+      switch (item.account) {
+        case 'Net Salary [631 0001]':
+          baseAmount = netSalaryForProjects
+          break
+        case 'Social Security [635 1001]':
+          baseAmount = payrollData?.socialSecurity || 0
+          break
+        case 'Employee Tax [620 1005]':
+          baseAmount = payrollData?.employeeTax || 0
+          break
+        case 'Employer Tax [620 1005]':
+          baseAmount = payrollData?.employerTax || 0
+          break
+        case 'Housing [635 4001]':
+          baseAmount = payrollData?.housing || 0
+          break
+        case 'Other Benefits [602 4001]':
+          baseAmount = payrollData?.otherBenefits || 0
+          break
+        case 'Fringe Benefit - Leave [631 0001]':
+          baseAmount = fringeBenefitAmount
+          break
+        default:
+          baseAmount = 0
+      }
+      
+      // Create rows for each project that has allocated hours
+      const projectRows: MonthlyAllocationItem[] = []
+      if (totalProjectHours > 0 && baseAmount > 0) {
+        activeProjects.forEach(project => {
+          const projectHours = projectData[project.id] || 0
+          if (projectHours > 0) {
+            const projectPercentage = (projectHours / totalProjectHours) * 100
+            const calculatedAmount = baseAmount * projectPercentage / 100
+            
+            projectRows.push({
+              ...item,
+              id: `${item.id}-${project.id}`,
+              currency: payrollData?.currency || 'USD',
+              amount: parseFloat(calculatedAmount.toFixed(2)),
+              project: project.name
+            })
+          }
+        })
+      }
+      
+      return projectRows
+    }).filter(item => {
+      const user = users.find(u => u.id === item.name || u.name === item.name)
+      if (!user) return false
+      
+      const monthKey = `${selectedYear}-${selectedMonth}`
+      const payrollData = user.payrollDataByMonth?.[monthKey]
+      
+      // Check corresponding amount in main table based on account category
+      switch (item.account) {
+        case 'Net Salary [631 0001]':
+          return payrollData?.netSalary && payrollData.netSalary > 0
+        case 'Social Security [635 1001]':
+          return payrollData?.socialSecurity && payrollData.socialSecurity > 0
+        case 'Employee Tax [620 1005]':
+          return payrollData?.employeeTax && payrollData.employeeTax > 0
+        case 'Employer Tax [620 1005]':
+          return payrollData?.employerTax && payrollData.employerTax > 0
+        case 'Housing [635 4001]':
+          return payrollData?.housing && payrollData.housing > 0
+        case 'Other Benefits [602 4001]':
+          return payrollData?.otherBenefits && payrollData.otherBenefits > 0
+        case 'Fringe Benefit - Leave [631 0001]':
+          // For fringe benefit, check if any leave data exists
+          const fringeData = user.fringeDataByMonth?.[monthKey]
+          return (fringeData?.annualLeave && fringeData.annualLeave > 0) ||
+                 (fringeData?.sickLeave && fringeData.sickLeave > 0) ||
+                 (fringeData?.publicHolidays && fringeData.publicHolidays > 0)
+        default:
+          return true
+      }
+    })
+
+    // Add payroll allocation rows for each active user
+    const payrollRows: MonthlyAllocationItem[] = []
+    users.filter(user => isUserActiveInSelectedMonth(user)).forEach(user => {
+      const monthKey = `${selectedYear}-${selectedMonth}`
+      const payrollData = user.payrollDataByMonth?.[monthKey]
+      
+      if (payrollData) {
+        const netSalary = payrollData?.netSalary || 0
+        const housing = payrollData?.housing || 0
+        const otherBenefits = payrollData?.otherBenefits || 0
+        const totalAmount = (netSalary + housing + otherBenefits) * -1
+        
+        payrollRows.push({
+          id: `payroll-${user.id}-${monthKey}`,
+          name: user.name,
+          code: user.vendorAC || '',
+          description: `${user.name} ${MONTHS[selectedMonth]} ${selectedYear} Payroll`,
+          currency: payrollData?.currency || 'USD',
+          amount: parseFloat(totalAmount.toFixed(2)),
+          project: '',
+          projectTask: '',
+          account: user.vendorAC ? `${user.name} [${user.vendorAC}]` : user.name
+        })
+      }
+    })
+
+    // Add entity payroll tax rows for each entity
+    const entityTaxRows: MonthlyAllocationItem[] = []
+    const entitySocialSecurityRows: MonthlyAllocationItem[] = []
+    Object.entries(groupedByEntity).forEach(([entity, entityUsers]) => {
+      const monthKey = `${selectedYear}-${selectedMonth}`
+      
+      // Find the entity configuration to get account codes
+      const entityConfig = entities.find(e => e.name === entity)
+      const taxAccountCode = entityConfig?.taxAccount || ''
+      const ssAccountCode = entityConfig?.ssAccount || ''
+      
+      // Calculate totals for this entity
+      let totalEmployeeTax = 0
+      let totalEmployerTax = 0
+      let totalSocialSecurity = 0
+      let entityCurrency = 'USD' // Default currency
+      
+      entityUsers.forEach(user => {
+        const payrollData = user.payrollDataByMonth?.[monthKey]
+        if (payrollData) {
+          totalEmployeeTax += payrollData?.employeeTax || 0
+          totalEmployerTax += payrollData?.employerTax || 0
+          totalSocialSecurity += payrollData?.socialSecurity || 0
+          // Use the currency of the first user with payroll data
+          if (!entityCurrency || entityCurrency === 'USD') {
+            entityCurrency = payrollData?.currency || 'USD'
+          }
         }
       })
-    }
-    
-    return projectRows
-  }).filter(item => {
-    const user = users.find(u => u.id === item.name || u.name === item.name)
-    if (!user) return false
-    
-    const monthKey = `${selectedYear}-${selectedMonth}`
-    const payrollData = user.payrollDataByMonth?.[monthKey]
-    
-    // Check corresponding amount in main table based on account category
-    switch (item.account) {
-      case 'Net Salary [631 0001]':
-        return payrollData?.netSalary && payrollData.netSalary > 0
-      case 'Social Security [635 1001]':
-        return payrollData?.socialSecurity && payrollData.socialSecurity > 0
-      case 'Employee Tax [620 1005]':
-        return payrollData?.employeeTax && payrollData.employeeTax > 0
-      case 'Employer Tax [620 1005]':
-        return payrollData?.employerTax && payrollData.employerTax > 0
-      case 'Housing [635 4001]':
-        return payrollData?.housing && payrollData.housing > 0
-      case 'Other Benefits [602 4001]':
-        return payrollData?.otherBenefits && payrollData.otherBenefits > 0
-      case 'Fringe Benefit - Leave [631 0001]':
-        // For fringe benefit, check if any leave data exists
-        const fringeData = user.fringeDataByMonth?.[monthKey]
-        return (fringeData?.annualLeave && fringeData.annualLeave > 0) ||
-               (fringeData?.sickLeave && fringeData.sickLeave > 0) ||
-               (fringeData?.publicHolidays && fringeData.publicHolidays > 0)
-      default:
-        return true
-    }
-  })
+      
+      // Add entity payroll tax row
+      const totalTaxAmount = (totalEmployeeTax + totalEmployerTax) * -1
+      if (totalEmployeeTax > 0 || totalEmployerTax > 0) {
+        entityTaxRows.push({
+          id: `entity-tax-${entity}-${monthKey}`,
+          name: entity,
+          code: taxAccountCode,
+          description: `${entity} Payroll Tax ${MONTHS[selectedMonth]} ${selectedYear}`,
+          currency: entityCurrency,
+          amount: parseFloat(totalTaxAmount.toFixed(2)),
+          project: '',
+          projectTask: '',
+          account: taxAccountCode ? `${entity} Payroll Tax [${taxAccountCode}]` : entity
+        })
+      }
+      
+      // Add entity social security row
+      const socialSecurityAmount = totalSocialSecurity * -1
+      if (totalSocialSecurity > 0) {
+        entitySocialSecurityRows.push({
+          id: `entity-ss-${entity}-${monthKey}`,
+          name: entity,
+          code: ssAccountCode,
+          description: `${entity} Social Security ${MONTHS[selectedMonth]} ${selectedYear}`,
+          currency: entityCurrency,
+          amount: parseFloat(socialSecurityAmount.toFixed(2)),
+          project: '',
+          projectTask: '',
+          account: ssAccountCode ? `${entity} Social Security [${ssAccountCode}]` : entity
+        })
+      }
+    })
+
+    return [...existingAllocationRows, ...payrollRows, ...entityTaxRows, ...entitySocialSecurityRows]
+  }, [monthlyAllocation, users, selectedMonth, selectedYear, activeProjects, isUserActiveInSelectedMonth])
 
   const getContrastColor = (hex: string) => {
     const r = parseInt(hex.slice(1, 3), 16)
@@ -585,8 +721,8 @@ export default function ActualAllocationPage() {
   }
 
   return (
-    <div className="p-6">
-      <nav className="bg-white border-b border-gray-200 px-6 py-3 mb-6">
+    <main className="min-h-screen bg-background">
+      <nav className="bg-white border-b border-gray-200 px-6 py-3">
         <div className="flex items-center gap-6">
           <h1 className="text-lg font-semibold text-gray-900">Staff Allocation Tool</h1>
           <div className="flex gap-4">
@@ -606,7 +742,7 @@ export default function ActualAllocationPage() {
               href="/actual-allocation" 
               className="text-blue-600 hover:text-blue-800 font-medium"
             >
-              Actual Allocation
+              Payroll Allocation
             </Link>
           </div>
           <div className="ml-auto flex gap-2 items-center">
@@ -666,7 +802,7 @@ export default function ActualAllocationPage() {
       </nav>
 
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold text-gray-800">Actual Allocation</h2>
+        <h2 className="text-lg font-semibold text-gray-800">Payroll Allocation</h2>
         <Button
           onClick={exportMainTable}
           variant="outline"
@@ -1067,6 +1203,6 @@ export default function ActualAllocationPage() {
           </table>
         </div>
       </div>
-    </div>
+    </main>
   )
 }

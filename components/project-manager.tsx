@@ -540,7 +540,7 @@ export function ProjectManager({
 
       {(showCreateModal || editingProjectId) && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-card p-6 rounded-lg border border-border shadow-lg max-w-5xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-card p-6 rounded-lg border border-border shadow-lg w-full h-full mx-4 overflow-y-auto">
             <h2 className="text-lg font-semibold text-foreground mb-4">
               {editingProjectId ? "Edit Project" : "Create New Project"}
             </h2>

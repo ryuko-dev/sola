@@ -2,7 +2,8 @@
 
 import React, { useState } from "react"
 import { Button } from "./ui/button"
-import { getSystemUsers, addSystemUser, updateSystemUser, deleteSystemUser, type SystemUser } from "../lib/storage"
+import { getSystemUsers, addSystemUser, updateSystemUser, deleteSystemUser, getCurrentUserData, setCurrentUserData, getCurrentUser, type SystemUser } from "../lib/storage"
+import type { Entity } from "../lib/types"
 
 interface UserManagementProps {
   isOpen: boolean
@@ -25,6 +26,30 @@ export function UserManagement({ isOpen, onClose }: UserManagementProps) {
     password: "",
     role: "editor" as 'admin' | 'editor' | 'viewer'
   })
+
+  // Entity management state
+  const [entities, setEntities] = useState<Entity[]>(() => {
+    if (typeof window !== 'undefined') {
+      const userData = getCurrentUserData()
+      return userData.entities || []
+    }
+    return []
+  })
+  const [newEntityName, setNewEntityName] = useState("")
+  const [newEntityCurrencyCode, setNewEntityCurrencyCode] = useState("")
+  const [newEntityTaxAccount, setNewEntityTaxAccount] = useState("")
+  const [newEntitySSAccount, setNewEntitySSAccount] = useState("")
+  const [showEntitySection, setShowEntitySection] = useState(false)
+
+  // Backup management state
+  const [showBackupSection, setShowBackupSection] = useState(false)
+
+  // Save entities to localStorage whenever they change
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setCurrentUserData({ entities })
+    }
+  }, [entities])
 
   const refreshUsers = () => {
     const allUsers = getSystemUsers()
@@ -92,13 +117,128 @@ export function UserManagement({ isOpen, onClose }: UserManagementProps) {
     }
   }
 
+  // Entity management functions
+  const handleAddEntity = () => {
+    if (!newEntityName.trim() || !newEntityCurrencyCode.trim()) return
+    
+    const newEntity: Entity = {
+      id: `entity-${Date.now()}`,
+      name: newEntityName.trim(),
+      currencyCode: newEntityCurrencyCode.trim(),
+      taxAccount: newEntityTaxAccount.trim(),
+      ssAccount: newEntitySSAccount.trim()
+    }
+    
+    setEntities(prev => [...prev, newEntity])
+    setNewEntityName("")
+    setNewEntityCurrencyCode("")
+    setNewEntityTaxAccount("")
+    setNewEntitySSAccount("")
+  }
+
+  const handleDeleteEntity = (entityId: string) => {
+    if (confirm("Are you sure you want to delete this entity?")) {
+      setEntities(prev => prev.filter(e => e.id !== entityId))
+    }
+  }
+
+  // Backup management functions
+  const handleCreateBackup = () => {
+    if (typeof window === 'undefined') return
+    
+    // Get all current user data
+    const currentUser = getCurrentUser()
+    if (!currentUser) return
+    
+    const userData = getCurrentUserData()
+    
+    // Create backup object with timestamp
+    const backup = {
+      timestamp: new Date().toISOString(),
+      version: "1.0",
+      data: {
+        projects: userData.projects || [],
+        users: userData.users || [],
+        allocations: userData.allocations || [],
+        positions: userData.positions || [],
+        entities: userData.entities || [],
+        startMonth: userData.startMonth,
+        startYear: userData.startYear,
+        systemUsers: userData.systemUsers || []
+      }
+    }
+    
+    // Convert to JSON and create downloadable file
+    const backupJson = JSON.stringify(backup, null, 2)
+    const blob = new Blob([backupJson], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    
+    // Create download link
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `sola-backup-${new Date().toISOString().split('T')[0]}.json`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    
+    alert('Backup created successfully!')
+  }
+
+  const handleImportBackup = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const backupText = e.target?.result as string
+        const backup = JSON.parse(backupText)
+        
+        // Validate backup structure
+        if (!backup.data || typeof backup.data !== 'object') {
+          throw new Error('Invalid backup file structure')
+        }
+        
+        if (confirm('This will overwrite all current data. Are you sure you want to continue?')) {
+          // Import all data
+          const dataToImport = backup.data
+          
+          // Update user data
+          setCurrentUserData({
+            projects: dataToImport.projects || [],
+            users: dataToImport.users || [],
+            allocations: dataToImport.allocations || [],
+            positions: dataToImport.positions || [],
+            entities: dataToImport.entities || [],
+            startMonth: dataToImport.startMonth,
+            startYear: dataToImport.startYear,
+            systemUsers: dataToImport.systemUsers || []
+          })
+          
+          // Update local state
+          setEntities(dataToImport.entities || [])
+          refreshUsers()
+          
+          alert('Backup imported successfully! Please refresh the page to see all changes.')
+        }
+      } catch (error) {
+        alert('Error importing backup: ' + (error as Error).message)
+      }
+    }
+    
+    reader.readAsText(file)
+    // Reset file input
+    event.target.value = ''
+  }
+
   if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">User Management</h3>
+          <h3 className="text-lg font-semibold">Settings</h3>
           <Button onClick={onClose} variant="outline" size="sm">
             ×
           </Button>
@@ -244,6 +384,149 @@ export function UserManagement({ isOpen, onClose }: UserManagementProps) {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Entity Management Section */}
+        <div className="border-t pt-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-semibold text-gray-700">Entity Management</h4>
+            <Button
+              onClick={() => setShowEntitySection(!showEntitySection)}
+              variant="outline"
+              size="sm"
+            >
+              {showEntitySection ? 'Hide' : 'Show'}
+            </Button>
+          </div>
+          
+          {showEntitySection && (
+            <div className="space-y-3">
+              {/* Add New Entity Form */}
+              <div className="border rounded-lg p-3 bg-gray-50">
+                <h5 className="text-sm font-medium mb-2">Add New Entity</h5>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    placeholder="Entity Name"
+                    value={newEntityName}
+                    onChange={(e) => setNewEntityName(e.target.value)}
+                    className="px-2 py-1 border rounded text-sm"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Currency Code"
+                    value={newEntityCurrencyCode}
+                    onChange={(e) => setNewEntityCurrencyCode(e.target.value)}
+                    className="px-2 py-1 border rounded text-sm"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Tax Account"
+                    value={newEntityTaxAccount}
+                    onChange={(e) => setNewEntityTaxAccount(e.target.value)}
+                    className="px-2 py-1 border rounded text-sm"
+                  />
+                  <input
+                    type="text"
+                    placeholder="SS Account"
+                    value={newEntitySSAccount}
+                    onChange={(e) => setNewEntitySSAccount(e.target.value)}
+                    className="px-2 py-1 border rounded text-sm"
+                  />
+                </div>
+                <Button onClick={handleAddEntity} size="sm" className="mt-2">
+                  Add Entity
+                </Button>
+              </div>
+
+              {/* Existing Entities List */}
+              {entities.length > 0 && (
+                <div className="border rounded-lg p-3">
+                  <h5 className="text-sm font-medium mb-2">Existing Entities</h5>
+                  <div className="space-y-2">
+                    {entities.map(entity => (
+                      <div key={entity.id} className="flex items-center justify-between p-2 border rounded text-xs bg-gray-50">
+                        <div>
+                          <div className="font-medium">{entity.name}</div>
+                          <div className="text-gray-600">
+                            Currency: {entity.currencyCode} | Tax: {entity.taxAccount} | SS: {entity.ssAccount}
+                          </div>
+                        </div>
+                        <Button
+                          onClick={() => handleDeleteEntity(entity.id)}
+                          variant="destructive"
+                          size="sm"
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Backup Management Section */}
+        <div className="border-t pt-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-semibold text-gray-700">Backup Management</h4>
+            <Button
+              onClick={() => setShowBackupSection(!showBackupSection)}
+              variant="outline"
+              size="sm"
+            >
+              {showBackupSection ? 'Hide' : 'Show'}
+            </Button>
+          </div>
+          
+          {showBackupSection && (
+            <div className="space-y-3">
+              <div className="border rounded-lg p-3 bg-gray-50">
+                <h5 className="text-sm font-medium mb-2">Data Backup & Restore</h5>
+                <p className="text-xs text-gray-600 mb-3">
+                  Create backups of all your data (projects, users, entities, allocations) and restore them when needed.
+                </p>
+                
+                <div className="space-y-3">
+                  {/* Create Backup */}
+                  <div className="flex items-center justify-between p-2 border rounded bg-white">
+                    <div>
+                      <div className="text-sm font-medium">Create Backup</div>
+                      <div className="text-xs text-gray-600">Download all data as JSON file</div>
+                    </div>
+                    <Button onClick={handleCreateBackup} size="sm">
+                      Create Backup
+                    </Button>
+                  </div>
+                  
+                  {/* Import Backup */}
+                  <div className="flex items-center justify-between p-2 border rounded bg-white">
+                    <div>
+                      <div className="text-sm font-medium">Import Backup</div>
+                      <div className="text-xs text-gray-600">Restore data from backup file</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="file"
+                        accept=".json"
+                        onChange={handleImportBackup}
+                        className="text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                  <p className="text-xs text-yellow-800">
+                    <strong>Warning:</strong> Importing a backup will overwrite all current data. 
+                    Make sure to create a backup before importing.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -24,7 +24,7 @@ export default function Home() {
               href="/actual-allocation" 
               className="text-gray-600 hover:text-gray-800 font-medium"
             >
-              Actual Allocation
+              Payroll Allocation
             </Link>
           </div>
         </div>

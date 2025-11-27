@@ -4,6 +4,7 @@ export interface UserData {
   users: any[]
   allocations: any[]
   positions: any[]
+  entities: any[]
   startMonth?: number
   startYear?: number
   systemUsers?: SystemUser[] // Global system users (for login)
@@ -86,10 +87,10 @@ export function clearCurrentUser(): void {
 }
 
 export function getUserData(email: string): UserData {
-  if (typeof window === 'undefined') return { projects: [], users: [], allocations: [], positions: [] }
+  if (typeof window === 'undefined') return { projects: [], users: [], allocations: [], positions: [], entities: [] }
   
   const data = localStorage.getItem(STORAGE_KEYS.USER_DATA_PREFIX + email)
-  return data ? JSON.parse(data) : { projects: [], users: [], allocations: [], positions: [] }
+  return data ? JSON.parse(data) : { projects: [], users: [], allocations: [], positions: [], entities: [] }
 }
 
 export function setUserData(email: string, data: Partial<UserData>): void {
@@ -108,7 +109,7 @@ export function clearUserData(email: string): void {
 // Convenience functions that work with the current user
 export function getCurrentUserData(): UserData {
   const currentUser = getCurrentUser()
-  if (!currentUser) return { projects: [], users: [], allocations: [], positions: [] }
+  if (!currentUser) return { projects: [], users: [], allocations: [], positions: [], entities: [] }
   return getUserData(currentUser)
 }
 

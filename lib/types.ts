@@ -1,3 +1,11 @@
+export interface Entity {
+  id: string
+  name: string
+  currencyCode: string
+  taxAccount: string
+  ssAccount: string
+}
+
 export interface Project {
   id: string
   name: string
@@ -26,6 +34,7 @@ export interface User {
   name: string
   department: string
   entity?: string    // Entity/organization assignment
+  vendorAC?: string  // Vendor AC information
   startDate?: string // ISO date string (YYYY-MM-DD)
   endDate?: string   // ISO date string (YYYY-MM-DD), undefined = no end date
   workDays?: 'mon-fri' | 'sun-thu' // Work week pattern, defaults to mon-fri

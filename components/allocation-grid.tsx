@@ -2,7 +2,7 @@
 
 import React from "react"
 import { useState, useEffect } from "react"
-import type { Project, User, Allocation, Position } from "../lib/types"
+import type { Project, User, Allocation, Position, Entity } from "../lib/types"
 import { Button } from "./ui/button"
 import { AllocationCell } from "./allocation-cell"
 import { ProjectManager } from "./project-manager"
@@ -205,6 +205,7 @@ export function AllocationGrid() {
   const [editingUserName, setEditingUserName] = useState("")
   const [editingUserDept, setEditingUserDept] = useState("")
   const [editingUserEntity, setEditingUserEntity] = useState("")
+  const [editingUserVendorAC, setEditingUserVendorAC] = useState("")
   const [editingUserStartDate, setEditingUserStartDate] = useState("")
   const [editingUserEndDate, setEditingUserEndDate] = useState("")
   const [editingUserWorkDays, setEditingUserWorkDays] = useState<'mon-fri' | 'sun-thu'>('mon-fri')
@@ -220,6 +221,15 @@ export function AllocationGrid() {
   const [customAllocationAmount, setCustomAllocationAmount] = useState<{ [key: string]: string }>({})
   const [selectedPositionForCustom, setSelectedPositionForCustom] = useState<string | null>(null)
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+  
+  // Load entities from localStorage for dropdown
+  const [entities, setEntities] = useState<Entity[]>(() => {
+    if (typeof window !== 'undefined') {
+      const userData = getCurrentUserData()
+      return userData.entities || []
+    }
+    return []
+  })
 
   // Check if current user has permission for specific actions
   const canEdit = currentUserRole === 'admin'
@@ -461,6 +471,7 @@ export function AllocationGrid() {
     setEditingUserName("")
     setEditingUserDept("")
     setEditingUserEntity("")
+    setEditingUserVendorAC("")
     setEditingUserStartDate("")
     setEditingUserEndDate("")
     setEditingUserWorkDays('mon-fri')
@@ -474,6 +485,7 @@ export function AllocationGrid() {
       setEditingUserName(user.name)
       setEditingUserDept(user.department)
       setEditingUserEntity(user.entity || "")
+      setEditingUserVendorAC(user.vendorAC || "")
       setEditingUserStartDate(user.startDate || "")
       setEditingUserEndDate(user.endDate || "")
       setEditingUserWorkDays(user.workDays || 'mon-fri')
@@ -493,6 +505,7 @@ export function AllocationGrid() {
                 name: editingUserName,
                 department: editingUserDept,
                 entity: editingUserEntity || undefined,
+                vendorAC: editingUserVendorAC || undefined,
                 startDate: editingUserStartDate || undefined,
                 endDate: editingUserEndDate || undefined,
                 workDays: editingUserWorkDays,
@@ -506,6 +519,7 @@ export function AllocationGrid() {
         name: editingUserName,
         department: editingUserDept,
         entity: editingUserEntity || undefined,
+        vendorAC: editingUserVendorAC || undefined,
         startDate: editingUserStartDate || undefined,
         endDate: editingUserEndDate || undefined,
         workDays: editingUserWorkDays,
@@ -518,6 +532,7 @@ export function AllocationGrid() {
     setEditingUserName("")
     setEditingUserDept("")
     setEditingUserEntity("")
+    setEditingUserVendorAC("")
     setEditingUserStartDate("")
     setEditingUserEndDate("")
     setEditingUserWorkDays('mon-fri')
@@ -1270,12 +1285,27 @@ export function AllocationGrid() {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Entity</label>
-                <input
-                  type="text"
+                <select
                   value={editingUserEntity}
                   onChange={(e) => setEditingUserEntity(e.target.value)}
                   className="w-full border rounded px-2 py-1"
-                  placeholder="Entity/Country"
+                >
+                  <option value="">Select Entity</option>
+                  {entities.map(entity => (
+                    <option key={entity.id} value={entity.name}>
+                      {entity.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Vendor AC</label>
+                <input
+                  type="text"
+                  value={editingUserVendorAC}
+                  onChange={(e) => setEditingUserVendorAC(e.target.value)}
+                  className="w-full border rounded px-2 py-1"
+                  placeholder="Vendor AC"
                 />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
