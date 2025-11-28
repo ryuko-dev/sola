@@ -54,6 +54,7 @@ export default function ActualAllocationPage() {
   const [users, setUsers] = React.useState<UserExtended[]>([])
   const [projects, setProjects] = React.useState<any[]>([])
   const [entities, setEntities] = React.useState<any[]>([])
+  const [allocations, setAllocations] = React.useState<any[]>([]) // Load staff allocations
   const [selectedMonth, setSelectedMonth] = React.useState<number>(new Date().getMonth())
   const [selectedYear, setSelectedYear] = React.useState<number>(new Date().getFullYear())
   const [isLocked, setIsLocked] = React.useState<boolean>(false)
@@ -83,6 +84,9 @@ export default function ActualAllocationPage() {
     
     // Load projects
     setProjects(userData.projects || [])
+    
+    // Load allocations from staff allocation table
+    setAllocations(userData.allocations || [])
     
     // Load entities for account codes
     setEntities(userData.entities || [])
@@ -455,6 +459,41 @@ export default function ActualAllocationPage() {
 
   const activeProjects = getActiveProjects()
 
+  // Function to automatically populate project task based on staff allocation
+  const getProjectTaskFromAllocation = (itemName: string, projectName: string, monthKey: string): string => {
+    // Find the user for this allocation item
+    const user = users.find(u => u.name === itemName)
+    if (!user) return ''
+    
+    // Get the global month index for the selected month/year
+    const globalMonthIndex = (selectedYear - 2024) * 12 + selectedMonth
+    
+    // Find allocations for this user, project, and month
+    const userAllocations = allocations.filter(a => 
+      a.userId === user.id && 
+      a.projectId === projects.find(p => p.name === projectName)?.id &&
+      a.monthIndex === globalMonthIndex
+    )
+    
+    if (userAllocations.length === 0) return ''
+    
+    // Get the position name from the allocation
+    const positionName = userAllocations[0].positionName
+    if (!positionName) return ''
+    
+    // Find the project and its positions for this month
+    const project = projects.find(p => p.name === projectName)
+    if (!project || !project.positions) return ''
+    
+    // Find the position for this month and get its projectTask
+    const position = project.positions.find(p => 
+      p.name === positionName && 
+      p.monthIndex === globalMonthIndex
+    )
+    
+    return position?.projectTask || ''
+  }
+
   // Filter monthly allocation rows based on main table amounts and update currency and auto-calculate amounts
   const filteredMonthlyAllocation = React.useMemo(() => {
     const existingAllocationRows = monthlyAllocation.flatMap(item => {
@@ -518,7 +557,8 @@ export default function ActualAllocationPage() {
               id: `${item.id}-${project.id}`,
               currency: payrollData?.currency || 'USD',
               amount: parseFloat(calculatedAmount.toFixed(2)),
-              project: project.name
+              project: project.name,
+              projectTask: getProjectTaskFromAllocation(item.name, project.name, monthKey)
             })
           }
         })
@@ -647,7 +687,7 @@ export default function ActualAllocationPage() {
     })
 
     return [...existingAllocationRows, ...payrollRows, ...entityTaxRows, ...entitySocialSecurityRows]
-  }, [monthlyAllocation, users, selectedMonth, selectedYear, activeProjects, isUserActiveInSelectedMonth])
+  }, [monthlyAllocation, users, selectedMonth, selectedYear, activeProjects, isUserActiveInSelectedMonth, allocations, projects])
 
   const getContrastColor = (hex: string) => {
     const r = parseInt(hex.slice(1, 3), 16)
@@ -675,6 +715,7 @@ export default function ActualAllocationPage() {
       const row: any = {
         Name: user.name,
         Department: user.department,
+        Entity: user.entity || '',
         Currency: payrollData?.currency || 'USD',
         'Net Salary': payrollData?.netSalary || 0,
         'Social Security': payrollData?.socialSecurity || 0,
@@ -689,15 +730,24 @@ export default function ActualAllocationPage() {
         'Daily Rate': payrollData?.netSalary && fringeData?.workingDays ? (payrollData.netSalary / fringeData.workingDays).toFixed(2) : '0.00'
       }
       
-      // Add project columns
+      // Add project columns - respect showPercentage state
       activeProjects.forEach(project => {
-        row[project.name] = projectData[project.id] || 0
+        if (showPercentage) {
+          // Calculate percentage for export
+          const totalProjectHours = activeProjects.reduce((total, p) => total + (projectData[p.id] || 0), 0)
+          const projectHours = projectData[project.id] || 0
+          const percentage = totalProjectHours > 0 ? (projectHours / totalProjectHours * 100).toFixed(1) : '0.0'
+          row[project.name] = `${percentage}%`
+        } else {
+          // Export raw values
+          row[project.name] = projectData[project.id] || 0
+        }
       })
       
       return row
     })
     
-    exportToExcel(exportData, `Actual_Allocation_${MONTHS[selectedMonth]}_${selectedYear}`)
+    exportToExcel(exportData, `Actual_Allocation_${MONTHS[selectedMonth]}_${selectedYear}_${showPercentage ? 'Percentage' : 'Values'}`)
   }
 
   const exportMonthlyTable = () => {
@@ -706,18 +756,33 @@ export default function ActualAllocationPage() {
       const accountName = item.account.split(' [')[0]
       const accountCode = item.account.includes(' [') ? item.account.split(' [')[1].replace(']', '') : ''
       
+      // Find the user associated with this allocation item for percentage calculation
+      const user = users.find(u => u.name === item.name)
+      let exportValue = item.amount
+      
+      // If percentage view is active and this is a user allocation (not payroll/tax/ss rows), calculate percentage
+      if (showPercentage && user && item.project) {
+        const monthKey = `${selectedYear}-${selectedMonth}`
+        const projectData = user.projectDataByMonth?.[monthKey] || {}
+        const totalProjectHours = activeProjects.reduce((total, p) => total + (projectData[p.id] || 0), 0)
+        const projectHours = projectData[item.project] || 0
+        const percentage = totalProjectHours > 0 ? (projectHours / totalProjectHours * 100).toFixed(1) : '0.0'
+        exportValue = parseFloat(percentage) // Export the percentage value
+      }
+      
       return {
         'Account Name': accountName,
         'Account Code': accountCode,
         Description: item.description,
         Currency: item.currency,
-        Amount: item.amount,
+        'Amount/Percentage': showPercentage && user && item.project ? 
+          `${exportValue}%` : exportValue,
         Project: item.project,
         'Project Task': item.projectTask
       }
     })
     
-    exportToExcel(exportData, `Monthly_Allocation_${MONTHS[selectedMonth]}_${selectedYear}`)
+    exportToExcel(exportData, `Monthly_Allocation_${MONTHS[selectedMonth]}_${selectedYear}_${showPercentage ? 'Percentage' : 'Values'}`)
   }
 
   return (
