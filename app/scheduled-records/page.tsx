@@ -726,7 +726,7 @@ export default function ScheduledRecordsPage() {
     <main className="min-h-screen bg-background">
       <nav className="bg-white border-b border-gray-200 px-6 py-3">
         <div className="flex items-center gap-6">
-          <h1 className="text-lg font-semibold text-gray-900">Sola</h1>
+          <h1 className="text-lg font-semibold text-gray-900">Sola Allocation Tool</h1>
           <div className="flex gap-4">
             <Link 
               href="/" 

@@ -69,7 +69,7 @@ export default function LoginPage() {
             <span className="text-white text-2xl font-bold">S</span>
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Welcome to Sola</h1>
-          <p className="text-gray-600 mt-2">Staff Allocation Tool</p>
+          <p className="text-gray-600 mt-2">Sola Allocation Tool</p>
         </div>
 
         {/* Login Form */}
@@ -145,7 +145,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <div className="mt-8 text-center text-sm text-gray-500">
-          <p>&copy; 2024 Sola Staff Allocation Tool. All rights reserved.</p>
+          <p>&copy; 2024 Sola Allocation Tool. All rights reserved.</p>
         </div>
       </div>
     </div>
