@@ -2,6 +2,8 @@
 
 import * as React from "react"
 import { Navigation } from "@/components/navigation"
+import { canEditPage, UserRole } from "@/lib/permissions"
+import { getCurrentSystemUser } from "@/lib/storage"
 import { Button } from "@/components/ui/button"
 
 const MONTHS = [
@@ -24,6 +26,7 @@ interface ScheduledRecord {
 }
 
 export default function ScheduledRecordsPage() {
+  const [currentUserRole, setCurrentUserRole] = React.useState<UserRole | null>(null)
   const [selectedMonth, setSelectedMonth] = React.useState<number>(() => {
     // Load saved month from localStorage or use current month
     if (typeof window !== 'undefined') {
@@ -74,6 +77,12 @@ export default function ScheduledRecordsPage() {
   // Handle client-side hydration
   React.useEffect(() => {
     setIsClient(true)
+    
+    // Load user role
+    const systemUser = getCurrentSystemUser()
+    if (systemUser) {
+      setCurrentUserRole(systemUser.role)
+    }
   }, [])
 
   // Load records from localStorage for each table
@@ -312,9 +321,11 @@ export default function ScheduledRecordsPage() {
             </h3>
           </div>
           <div className="flex items-center gap-2">
-            <Button onClick={() => addRecord(config.key)} variant="outline" size="sm">
-              + Add Record
-            </Button>
+            {canEdit && (
+              <Button onClick={() => addRecord(config.key)} variant="outline" size="sm">
+                + Add Record
+              </Button>
+            )}
             <button
               onClick={() => toggleCollapse(config.key)}
               className="flex items-center gap-2 px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
@@ -377,7 +388,7 @@ export default function ScheduledRecordsPage() {
                       isFinished ? 'bg-gray-100' : ''
                     }>
                       <td className="border border-gray-300 p-0.5 w-20">
-                        {record.isEditing ? (
+                        {canEdit && record.isEditing ? (
                           <input
                             type="date"
                             value={record.purchaseDate}
@@ -389,7 +400,7 @@ export default function ScheduledRecordsPage() {
                         )}
                       </td>
                       <td className="border border-gray-300 p-0.5">
-                        {record.isEditing ? (
+                        {canEdit && record.isEditing ? (
                           <input
                             type="text"
                             value={record.description}
@@ -402,7 +413,7 @@ export default function ScheduledRecordsPage() {
                         )}
                       </td>
                       <td className="border border-gray-300 p-0.5 w-16">
-                        {record.isEditing ? (
+                        {canEdit && record.isEditing ? (
                           <input
                             type="text"
                             value={record.currency}
@@ -416,7 +427,7 @@ export default function ScheduledRecordsPage() {
                         )}
                       </td>
                       <td className="border border-gray-300 p-0.5 w-20">
-                        {record.isEditing ? (
+                        {canEdit && record.isEditing ? (
                           <input
                             type="number"
                             value={record.amount}
@@ -431,7 +442,7 @@ export default function ScheduledRecordsPage() {
                         )}
                       </td>
                       <td className="border border-gray-300 p-0.5 w-20">
-                        {record.isEditing ? (
+                        {canEdit && record.isEditing ? (
                           <input
                             type="number"
                             value={record.usdAmount}
@@ -446,16 +457,17 @@ export default function ScheduledRecordsPage() {
                         )}
                       </td>
                       <td className="border border-gray-300 p-0.5 w-16">
-                        {record.isEditing ? (
+                        {canEdit && record.isEditing ? (
                           <input
                             type="number"
                             value={record.usefulMonths}
                             onChange={(e) => updateRecord(config.key, record.id, 'usefulMonths', parseInt(e.target.value) || 1)}
                             className="w-full text-center border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-500 rounded text-xs"
                             min="1"
+                            max="360"
                           />
                         ) : (
-                          <span className="text-xs text-center block">{record.usefulMonths}</span>
+                          <span className="text-xs">{record.usefulMonths}</span>
                         )}
                       </td>
                       <td className="border border-gray-300 p-0.5 w-20 text-right">
@@ -466,7 +478,7 @@ export default function ScheduledRecordsPage() {
                       </td>
                       {hasEditingRecord && (
                         <td className="border border-gray-300 p-0.5 w-20">
-                          {record.isEditing ? (
+                          {canEdit && record.isEditing ? (
                             <input
                               type="date"
                               value={record.disposalDate || ''}
@@ -480,12 +492,14 @@ export default function ScheduledRecordsPage() {
                       )}
                       {hasEditingRecord && (
                         <td className="border border-gray-300 p-0.5 w-12 text-center">
-                          <input
-                            type="checkbox"
-                            checked={record.isFinished}
-                            onChange={(e) => updateRecord(config.key, record.id, 'isFinished', e.target.checked)}
-                            className="w-3 h-3 text-blue-600 rounded focus:ring-blue-500"
-                          />
+                          {canEdit && (
+                            <input
+                              type="checkbox"
+                              checked={record.isFinished}
+                              onChange={(e) => updateRecord(config.key, record.id, 'isFinished', e.target.checked)}
+                              className="w-3 h-3 text-blue-600 rounded focus:ring-blue-500"
+                            />
+                          )}
                         </td>
                       )}
                       {monthColumns.map(column => (
@@ -494,34 +508,38 @@ export default function ScheduledRecordsPage() {
                         </td>
                       ))}
                       <td className="border border-gray-300 p-0.5 text-center w-16">
-                        {record.isEditing ? (
-                          <div className="flex gap-1 justify-center">
-                            <Button
-                              onClick={() => saveRecord(config.key, record.id)}
-                              variant="outline"
-                              size="sm"
-                              className="text-green-600 hover:text-green-800 text-xs px-1 py-0.5 h-5"
-                            >
-                              Save
-                            </Button>
-                            <Button
-                              onClick={() => deleteRecord(config.key, record.id)}
-                              variant="outline"
-                              size="sm"
-                              className="text-red-600 hover:text-red-800 text-xs px-1 py-0.5 h-5"
-                            >
-                              Del
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button
-                            onClick={() => toggleEdit(config.key, record.id)}
-                            variant="outline"
-                            size="sm"
-                            className="text-blue-600 hover:text-blue-800 text-xs px-1 py-0.5 h-5"
-                          >
-                            Edit
-                          </Button>
+                        {canEdit && (
+                          <>
+                            {record.isEditing ? (
+                              <div className="flex gap-1 justify-center">
+                                <Button
+                                  onClick={() => saveRecord(config.key, record.id)}
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-green-600 hover:text-green-800 text-xs px-1 py-0.5 h-5"
+                                >
+                                  Save
+                                </Button>
+                                <Button
+                                  onClick={() => deleteRecord(config.key, record.id)}
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-red-600 hover:text-red-800 text-xs px-1 py-0.5 h-5"
+                                >
+                                  Del
+                                </Button>
+                              </div>
+                            ) : (
+                              <Button
+                                onClick={() => toggleEdit(config.key, record.id)}
+                                variant="outline"
+                                size="sm"
+                                className="text-blue-600 hover:text-blue-800 text-xs px-1 py-0.5 h-5"
+                              >
+                                Edit
+                              </Button>
+                            )}
+                          </>
                         )}
                       </td>
                     </tr>
@@ -717,6 +735,9 @@ export default function ScheduledRecordsPage() {
   }
 
   const monthColumns = generateMonthColumns()
+
+  // Check if current user has permission for editing
+  const canEdit = currentUserRole ? canEditPage(currentUserRole, 'scheduledRecords') : false
 
   if (!isClient) {
     return null

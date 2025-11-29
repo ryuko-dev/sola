@@ -3,6 +3,7 @@
 import * as React from "react"
 import type { User, Project, Allocation } from "@/lib/types"
 import { getCurrentUser, getCurrentUserData, getCurrentSystemUser } from "@/lib/storage"
+import { canEditPage, UserRole } from "@/lib/permissions"
 import { Button } from "@/components/ui/button"
 import { Navigation } from "@/components/navigation"
 import Link from "next/link"
@@ -23,6 +24,7 @@ interface ExpenseAllocationRow {
 
 export default function ExpenseAllocationPage() {
   const [currentUser, setCurrentUser] = React.useState<string | null>(null)
+  const [currentUserRole, setCurrentUserRole] = React.useState<UserRole | null>(null)
   const [selectedMonth, setSelectedMonth] = React.useState<number>(() => {
     // Load saved month from localStorage or use current month
     if (typeof window !== 'undefined') {
@@ -71,6 +73,7 @@ export default function ExpenseAllocationPage() {
     }
     
     setCurrentUser(user)
+    setCurrentUserRole(systemUser.role)
 
     // Load data from localStorage
     const userData = getCurrentUserData()
@@ -187,6 +190,9 @@ export default function ExpenseAllocationPage() {
     })
     return Array.from(entities).sort()
   }, [users])
+
+  // Check if current user has permission for editing
+  const canEdit = currentUserRole ? canEditPage(currentUserRole, 'expenseAllocation') : false
 
   // Add new expense row
   const addExpenseRow = () => {
@@ -673,9 +679,11 @@ export default function ExpenseAllocationPage() {
                     </span>
                   )}
                 </div>
-                <Button onClick={addExpenseRow} variant="outline" size="sm">
-                  + Add Row
-                </Button>
+                {canEdit && (
+                  <Button onClick={addExpenseRow} variant="outline" size="sm">
+                    + Add Row
+                  </Button>
+                )}
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse border border-gray-300 text-xs">
@@ -708,46 +716,62 @@ export default function ExpenseAllocationPage() {
                     {filteredExpenseRows.map((row) => (
                       <tr key={row.id}>
                         <td className="border border-gray-300 p-1 w-24">
-                          <select
-                            value={row.entity}
-                            onChange={(e) => updateExpenseRow(row.id, 'entity', e.target.value)}
-                            className="w-full border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-500 rounded text-xs"
-                          >
-                            <option value="">Select Entity</option>
-                            {uniqueEntities.map(entity => (
-                              <option key={entity} value={entity}>{entity}</option>
-                            ))}
-                          </select>
+                          {canEdit ? (
+                            <select
+                              value={row.entity}
+                              onChange={(e) => updateExpenseRow(row.id, 'entity', e.target.value)}
+                              className="w-full border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-500 rounded text-xs"
+                            >
+                              <option value="">Select Entity</option>
+                              {uniqueEntities.map(entity => (
+                                <option key={entity} value={entity}>{entity}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <div className="text-xs">{row.entity}</div>
+                          )}
                         </td>
                         <td className="border border-gray-300 p-1">
-                          <input
-                            type="text"
-                            value={row.description}
-                            onChange={(e) => updateExpenseRow(row.id, 'description', e.target.value)}
-                            className="w-full border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-500 rounded text-xs"
-                            placeholder="Enter description"
-                          />
+                          {canEdit ? (
+                            <input
+                              type="text"
+                              value={row.description}
+                              onChange={(e) => updateExpenseRow(row.id, 'description', e.target.value)}
+                              className="w-full border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-500 rounded text-xs"
+                              placeholder="Enter description"
+                            />
+                          ) : (
+                            <div className="text-xs">{row.description}</div>
+                          )}
                         </td>
                         <td className="border border-gray-300 p-1 w-20">
-                          <input
-                            type="text"
-                            value={row.currency}
-                            onChange={(e) => updateExpenseRow(row.id, 'currency', e.target.value)}
-                            className="w-full border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-500 rounded text-xs text-center"
-                            placeholder="USD"
-                            maxLength={3}
-                          />
+                          {canEdit ? (
+                            <input
+                              type="text"
+                              value={row.currency}
+                              onChange={(e) => updateExpenseRow(row.id, 'currency', e.target.value)}
+                              className="w-full border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-500 rounded text-xs text-center"
+                              placeholder="USD"
+                              maxLength={3}
+                            />
+                          ) : (
+                            <div className="text-xs text-center">{row.currency}</div>
+                          )}
                         </td>
                         <td className="border border-gray-300 p-1 w-28">
-                          <input
-                            type="number"
-                            value={row.amount}
-                            onChange={(e) => updateExpenseRow(row.id, 'amount', parseFloat(e.target.value) || 0)}
-                            className="w-full text-right border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-500 rounded text-xs"
-                            placeholder="0.00"
-                            step="0.01"
-                            min="0"
-                          />
+                          {canEdit ? (
+                            <input
+                              type="number"
+                              value={row.amount}
+                              onChange={(e) => updateExpenseRow(row.id, 'amount', parseFloat(e.target.value) || 0)}
+                              className="w-full text-right border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-500 rounded text-xs"
+                              placeholder="0.00"
+                              step="0.01"
+                              min="0"
+                            />
+                          ) : (
+                            <div className="text-xs text-right">{row.amount.toFixed(2)}</div>
+                          )}
                         </td>
                         {uniqueProjects.map(project => (
                           <td key={project} className="border border-gray-300 p-1 text-right text-xs w-24">
@@ -755,14 +779,16 @@ export default function ExpenseAllocationPage() {
                           </td>
                         ))}
                         <td className="border border-gray-300 p-1 text-center w-20">
-                          <Button
-                            onClick={() => deleteExpenseRow(row.id)}
-                            variant="outline"
+                          {canEdit && (
+                            <Button
+                              onClick={() => deleteExpenseRow(row.id)}
+                              variant="outline"
                             size="sm"
                             className="text-red-600 hover:text-red-800 text-xs px-2 py-1"
                           >
                             Delete
                           </Button>
+                        )}
                         </td>
                       </tr>
                     ))}
