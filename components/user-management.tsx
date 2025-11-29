@@ -155,11 +155,29 @@ export function UserManagement({ isOpen, onClose }: UserManagementProps) {
     
     const userData = getCurrentUserData()
     
-    // Create backup object with timestamp
+    // Collect all localStorage data for comprehensive backup
+    const allLocalStorageData: Record<string, any> = {}
+    
+    // Iterate through all localStorage keys
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith('sola-')) {
+        try {
+          allLocalStorageData[key] = JSON.parse(localStorage.getItem(key) || 'null')
+        } catch (error) {
+          // If parsing fails, store as raw string
+          allLocalStorageData[key] = localStorage.getItem(key)
+        }
+      }
+    }
+    
+    // Create comprehensive backup object with timestamp
     const backup = {
       timestamp: new Date().toISOString(),
-      version: "1.0",
+      version: "2.0",
+      description: "Complete Sola system backup including all data sections",
       data: {
+        // Core user data
         projects: userData.projects || [],
         users: userData.users || [],
         allocations: userData.allocations || [],
@@ -167,8 +185,63 @@ export function UserManagement({ isOpen, onClose }: UserManagementProps) {
         entities: userData.entities || [],
         startMonth: userData.startMonth,
         startYear: userData.startYear,
-        systemUsers: userData.systemUsers || []
-      }
+        systemUsers: userData.systemUsers || [],
+        
+        // Shared state
+        sharedMonthYear: allLocalStorageData['sola-shared-month-year'] || null,
+        
+        // Lock states
+        lockStates: Object.keys(allLocalStorageData)
+          .filter(key => key.startsWith('sola-lock-state-'))
+          .reduce((acc, key) => {
+            acc[key] = allLocalStorageData[key]
+            return acc
+          }, {} as Record<string, any>),
+        
+        // Payroll data
+        payrollData: Object.keys(allLocalStorageData)
+          .filter(key => key.includes('payroll') || key.includes('monthly-allocation'))
+          .reduce((acc, key) => {
+            acc[key] = allLocalStorageData[key]
+            return acc
+          }, {} as Record<string, any>),
+        
+        // Expense allocation data
+        expenseAllocationData: Object.keys(allLocalStorageData)
+          .filter(key => key.includes('expense-allocation'))
+          .reduce((acc, key) => {
+            acc[key] = allLocalStorageData[key]
+            return acc
+          }, {} as Record<string, any>),
+        
+        // Scheduled records data
+        scheduledRecordsData: Object.keys(allLocalStorageData)
+          .filter(key => key.includes('scheduled-records'))
+          .reduce((acc, key) => {
+            acc[key] = allLocalStorageData[key]
+            return acc
+          }, {} as Record<string, any>),
+        
+        // All other Sola data (catch-all for any future additions)
+        otherData: Object.keys(allLocalStorageData)
+          .filter(key => 
+            key.startsWith('sola-') && 
+            !key.includes('shared-month-year') &&
+            !key.startsWith('sola-lock-state-') &&
+            !key.includes('payroll') &&
+            !key.includes('monthly-allocation') &&
+            !key.includes('expense-allocation') &&
+            !key.includes('scheduled-records') &&
+            !['sola-projects', 'sola-users', 'sola-allocations', 'sola-positions', 'sola-entities', 'sola-system-users', 'sola-start-month', 'sola-start-year'].includes(key)
+          )
+          .reduce((acc, key) => {
+            acc[key] = allLocalStorageData[key]
+            return acc
+          }, {} as Record<string, any>)
+      },
+      
+      // Include raw localStorage for complete backup
+      rawLocalStorage: allLocalStorageData
     }
     
     // Convert to JSON and create downloadable file
@@ -179,13 +252,13 @@ export function UserManagement({ isOpen, onClose }: UserManagementProps) {
     // Create download link
     const link = document.createElement('a')
     link.href = url
-    link.download = `sola-backup-${new Date().toISOString().split('T')[0]}.json`
+    link.download = `sola-complete-backup-${new Date().toISOString().split('T')[0]}.json`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
     
-    alert('Backup created successfully!')
+    alert('Complete backup created successfully! All data sections included.')
   }
 
   const handleImportBackup = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -203,11 +276,10 @@ export function UserManagement({ isOpen, onClose }: UserManagementProps) {
           throw new Error('Invalid backup file structure')
         }
         
-        if (confirm('This will overwrite all current data. Are you sure you want to continue?')) {
-          // Import all data
+        if (confirm('This will overwrite all current data including all sections. Are you sure you want to continue?')) {
           const dataToImport = backup.data
           
-          // Update user data
+          // Import core user data
           setCurrentUserData({
             projects: dataToImport.projects || [],
             users: dataToImport.users || [],
@@ -219,11 +291,60 @@ export function UserManagement({ isOpen, onClose }: UserManagementProps) {
             systemUsers: dataToImport.systemUsers || []
           })
           
+          // Import shared month/year state
+          if (dataToImport.sharedMonthYear) {
+            localStorage.setItem('sola-shared-month-year', JSON.stringify(dataToImport.sharedMonthYear))
+          }
+          
+          // Import lock states
+          if (dataToImport.lockStates) {
+            Object.entries(dataToImport.lockStates).forEach(([key, value]) => {
+              localStorage.setItem(key, JSON.stringify(value))
+            })
+          }
+          
+          // Import payroll data
+          if (dataToImport.payrollData) {
+            Object.entries(dataToImport.payrollData).forEach(([key, value]) => {
+              localStorage.setItem(key, JSON.stringify(value))
+            })
+          }
+          
+          // Import expense allocation data
+          if (dataToImport.expenseAllocationData) {
+            Object.entries(dataToImport.expenseAllocationData).forEach(([key, value]) => {
+              localStorage.setItem(key, JSON.stringify(value))
+            })
+          }
+          
+          // Import scheduled records data
+          if (dataToImport.scheduledRecordsData) {
+            Object.entries(dataToImport.scheduledRecordsData).forEach(([key, value]) => {
+              localStorage.setItem(key, JSON.stringify(value))
+            })
+          }
+          
+          // Import other data
+          if (dataToImport.otherData) {
+            Object.entries(dataToImport.otherData).forEach(([key, value]) => {
+              localStorage.setItem(key, JSON.stringify(value))
+            })
+          }
+          
+          // If backup includes raw localStorage (for backward compatibility)
+          if (backup.rawLocalStorage) {
+            Object.entries(backup.rawLocalStorage).forEach(([key, value]) => {
+              if (key.startsWith('sola-')) {
+                localStorage.setItem(key, JSON.stringify(value))
+              }
+            })
+          }
+          
           // Update local state
           setEntities(dataToImport.entities || [])
           refreshUsers()
           
-          alert('Backup imported successfully! Please refresh the page to see all changes.')
+          alert('Complete backup imported successfully! All data sections restored. Please refresh the page to see all changes.')
         }
       } catch (error) {
         alert('Error importing backup: ' + (error as Error).message)
@@ -516,17 +637,19 @@ export function UserManagement({ isOpen, onClose }: UserManagementProps) {
           {showBackupSection && (
             <div className="space-y-3">
               <div className="border rounded-lg p-3 bg-gray-50">
-                <h5 className="text-sm font-medium mb-2">Data Backup & Restore</h5>
+                <h5 className="text-sm font-medium mb-2">Complete Data Backup & Restore</h5>
                 <p className="text-xs text-gray-600 mb-3">
-                  Create backups of all your data (projects, users, entities, allocations) and restore them when needed.
+                  Create comprehensive backups of ALL system data including projects, users, entities, allocations, 
+                  payroll data, expense allocation, scheduled records, lock states, and shared settings. 
+                  Restore everything when needed.
                 </p>
                 
                 <div className="space-y-3">
                   {/* Create Backup */}
                   <div className="flex items-center justify-between p-2 border rounded bg-white">
                     <div>
-                      <div className="text-sm font-medium">Create Backup</div>
-                      <div className="text-xs text-gray-600">Download all data as JSON file</div>
+                      <div className="text-sm font-medium">Create Complete Backup</div>
+                      <div className="text-xs text-gray-600">Download ALL system data including all sections</div>
                     </div>
                     <Button onClick={handleCreateBackup} size="sm">
                       Create Backup
@@ -536,8 +659,8 @@ export function UserManagement({ isOpen, onClose }: UserManagementProps) {
                   {/* Import Backup */}
                   <div className="flex items-center justify-between p-2 border rounded bg-white">
                     <div>
-                      <div className="text-sm font-medium">Import Backup</div>
-                      <div className="text-xs text-gray-600">Restore data from backup file</div>
+                      <div className="text-sm font-medium">Import Complete Backup</div>
+                      <div className="text-xs text-gray-600">Restore ALL data sections from backup file</div>
                     </div>
                     <div className="flex items-center gap-2">
                       <input
