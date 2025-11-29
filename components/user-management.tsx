@@ -44,6 +44,9 @@ export function UserManagement({ isOpen, onClose }: UserManagementProps) {
   // Backup management state
   const [showBackupSection, setShowBackupSection] = useState(false)
 
+  // User management section state
+  const [showUserSection, setShowUserSection] = useState(true)
+
   // Save entities to localStorage whenever they change
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -244,146 +247,162 @@ export function UserManagement({ isOpen, onClose }: UserManagementProps) {
           </Button>
         </div>
 
-        <div className="space-y-4">
-          {/* Edit User Form */}
-          {editingUser && (
-            <div className="p-4 border rounded-lg bg-blue-50 space-y-3">
-              <h4 className="font-medium text-sm">Edit User: {editingUser.name}</h4>
-              <input
-                type="email"
-                placeholder="Email"
-                value={editForm.email}
-                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                className="w-full px-3 py-2 border rounded text-sm"
-              />
-              <input
-                type="text"
-                placeholder="Name"
-                value={editForm.name}
-                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                className="w-full px-3 py-2 border rounded text-sm"
-              />
-              <input
-                type="password"
-                placeholder="Password (leave empty to keep current)"
-                value={editForm.password}
-                onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
-                className="w-full px-3 py-2 border rounded text-sm"
-              />
-              <select
-                value={editForm.role}
-                onChange={(e) => setEditForm({ ...editForm, role: e.target.value as 'admin' | 'editor' | 'viewer' })}
-                className="w-full px-3 py-2 border rounded text-sm"
-              >
-                <option value="admin">Admin</option>
-                <option value="editor">Editor</option>
-                <option value="viewer">Viewer</option>
-              </select>
-              <div className="flex gap-2">
-                <Button onClick={handleSaveEdit} size="sm">Save Changes</Button>
-                <Button onClick={handleCancelEdit} variant="outline" size="sm">Cancel</Button>
-              </div>
-            </div>
-          )}
-
-          {/* Add User Form */}
-          {isAdding && (
-            <div className="p-4 border rounded-lg bg-gray-50 space-y-3">
-              <input
-                type="email"
-                placeholder="Email"
-                value={newUser.email}
-                onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                className="w-full px-3 py-2 border rounded text-sm"
-              />
-              <input
-                type="text"
-                placeholder="Name"
-                value={newUser.name}
-                onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-                className="w-full px-3 py-2 border rounded text-sm"
-              />
-              <input
-                type="password"
-                placeholder="Password"
-                value={newUser.password}
-                onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                className="w-full px-3 py-2 border rounded text-sm"
-              />
-              <select
-                value={newUser.role}
-                onChange={(e) => setNewUser({ ...newUser, role: e.target.value as 'admin' | 'editor' | 'viewer' })}
-                className="w-full px-3 py-2 border rounded text-sm"
-              >
-                <option value="admin">Admin</option>
-                <option value="editor">Editor</option>
-                <option value="viewer">Viewer</option>
-              </select>
-              <div className="flex gap-2">
-                <Button onClick={handleAddUser} size="sm">Add User</Button>
-                <Button onClick={() => setIsAdding(false)} variant="outline" size="sm">Cancel</Button>
-              </div>
-            </div>
-          )}
-
-          {/* Add User Button */}
-          {!isAdding && (
-            <Button onClick={() => setIsAdding(true)} variant="outline" size="sm">
-              + Add New User
+        {/* User Management Section */}
+        <div className="border-b pb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-semibold text-gray-700">User Management</h4>
+            <Button
+              onClick={() => setShowUserSection(!showUserSection)}
+              variant="outline"
+              size="sm"
+            >
+              {showUserSection ? 'Hide' : 'Show'}
             </Button>
-          )}
-
-          {/* Users List */}
-          <div className="space-y-2">
-            {users.map((user) => (
-              <div key={user.id} className="flex items-center justify-between p-3 border rounded">
-                <div className="flex-1">
-                  <div className="font-medium text-sm">{user.name}</div>
-                  <div className="text-xs text-gray-500">{user.email}</div>
-                  <div className="text-xs">
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      user.role === 'admin' ? 'bg-red-100 text-red-700' :
-                      user.role === 'editor' ? 'bg-blue-100 text-blue-700' :
-                      'bg-gray-100 text-gray-700'
-                    }`}>
-                      {user.role}
-                    </span>
-                    <span className={`ml-2 px-2 py-1 rounded text-xs ${
-                      user.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                    }`}>
-                      {user.isActive ? 'Active' : 'Inactive'}
-                    </span>
+          </div>
+          
+          {showUserSection && (
+            <div className="space-y-4">
+              {/* Edit User Form */}
+              {editingUser && (
+                <div className="p-4 border rounded-lg bg-blue-50 space-y-3">
+                  <h4 className="font-medium text-sm">Edit User: {editingUser.name}</h4>
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    value={editForm.email}
+                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Name"
+                    value={editForm.name}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                  <input
+                    type="password"
+                    placeholder="Password (leave empty to keep current)"
+                    value={editForm.password}
+                    onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                  <select
+                    value={editForm.role}
+                    onChange={(e) => setEditForm({ ...editForm, role: e.target.value as 'admin' | 'editor' | 'viewer' })}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  >
+                    <option value="admin">Admin</option>
+                    <option value="editor">Editor</option>
+                    <option value="viewer">Viewer</option>
+                  </select>
+                  <div className="flex gap-2">
+                    <Button onClick={handleSaveEdit} size="sm">Save Changes</Button>
+                    <Button onClick={handleCancelEdit} variant="outline" size="sm">Cancel</Button>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => handleEditUser(user)}
-                    variant="outline"
-                    size="sm"
+              )}
+
+              {/* Add User Form */}
+              {isAdding && (
+                <div className="p-4 border rounded-lg bg-gray-50 space-y-3">
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    value={newUser.email}
+                    onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Name"
+                    value={newUser.name}
+                    onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                  <input
+                    type="password"
+                    placeholder="Password"
+                    value={newUser.password}
+                    onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                  <select
+                    value={newUser.role}
+                    onChange={(e) => setNewUser({ ...newUser, role: e.target.value as 'admin' | 'editor' | 'viewer' })}
+                    className="w-full px-3 py-2 border rounded text-sm"
                   >
-                    Edit
-                  </Button>
-                  <Button
-                    onClick={() => handleToggleActive(user.id, !user.isActive)}
-                    variant="outline"
-                    size="sm"
-                  >
-                    {user.isActive ? 'Deactivate' : 'Activate'}
-                  </Button>
-                  {user.email !== 'admin@sola.com' && (
-                    <Button
-                      onClick={() => handleDeleteUser(user.id)}
-                      variant="outline"
-                      size="sm"
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      Delete
-                    </Button>
-                  )}
+                    <option value="admin">Admin</option>
+                    <option value="editor">Editor</option>
+                    <option value="viewer">Viewer</option>
+                  </select>
+                  <div className="flex gap-2">
+                    <Button onClick={handleAddUser} size="sm">Add User</Button>
+                    <Button onClick={() => setIsAdding(false)} variant="outline" size="sm">Cancel</Button>
+                  </div>
                 </div>
+              )}
+
+              {/* Add User Button */}
+              {!isAdding && (
+                <Button onClick={() => setIsAdding(true)} variant="outline" size="sm">
+                  + Add New User
+                </Button>
+              )}
+
+              {/* Users List */}
+              <div className="space-y-2">
+                {users.map((user) => (
+                  <div key={user.id} className="flex items-center justify-between p-3 border rounded">
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">{user.name}</div>
+                      <div className="text-xs text-gray-500">{user.email}</div>
+                      <div className="text-xs">
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          user.role === 'admin' ? 'bg-red-100 text-red-700' :
+                          user.role === 'editor' ? 'bg-blue-100 text-blue-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {user.role}
+                        </span>
+                        <span className={`ml-2 px-2 py-1 rounded text-xs ${
+                          user.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                        }`}>
+                          {user.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => handleEditUser(user)}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        onClick={() => handleToggleActive(user.id, !user.isActive)}
+                        variant="outline"
+                        size="sm"
+                      >
+                        {user.isActive ? 'Deactivate' : 'Activate'}
+                      </Button>
+                      {user.email !== 'admin@sola.com' && (
+                        <Button
+                          onClick={() => handleDeleteUser(user.id)}
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          Delete
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Entity Management Section */}
