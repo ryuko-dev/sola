@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
+import { Navigation } from "@/components/navigation"
 import { Button } from "@/components/ui/button"
 
 const MONTHS = [
@@ -724,42 +724,12 @@ export default function ScheduledRecordsPage() {
 
   return (
     <main className="min-h-screen bg-background">
-      <nav className="bg-white border-b border-gray-200 px-6 py-3">
-        <div className="flex items-center gap-6">
-          <h1 className="text-lg font-semibold text-gray-900">Sola Allocation Tool</h1>
-          <div className="flex gap-4">
-            <Link 
-              href="/" 
-              className="text-gray-600 hover:text-gray-800 font-medium"
-            >
-              Allocation
-            </Link>
-            <Link 
-              href="/planning" 
-              className="text-gray-600 hover:text-gray-800 font-medium"
-            >
-              Planning
-            </Link>
-            <Link 
-              href="/actual-allocation" 
-              className="text-gray-600 hover:text-gray-800 font-medium"
-            >
-              Payroll Allocation
-            </Link>
-            <Link 
-              href="/expense-allocation" 
-              className="text-gray-600 hover:text-gray-800 font-medium"
-            >
-              Expense Allocation
-            </Link>
-            <Link 
-              href="/scheduled-records" 
-              className="text-blue-600 hover:text-blue-800 font-medium"
-            >
-              Scheduled Records
-            </Link>
-          </div>
-          <div className="ml-auto flex items-center gap-2">
+      <Navigation currentPage="/scheduled-records" />
+      <div className="flex justify-between items-center mb-4 p-6">
+        <h2 className="text-xl font-semibold text-gray-800">Scheduled Records</h2>
+        <div className="flex gap-3 items-end">
+          <div className="space-y-1">
+            <label className="block text-xs font-medium">Start Month</label>
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(Number(e.target.value))}
@@ -792,7 +762,7 @@ export default function ScheduledRecordsPage() {
             </label>
           </div>
         </div>
-      </nav>
+      </div>
 
       <div className="p-6">
         {/* Render all tables */}

@@ -4,6 +4,7 @@ import * as React from "react"
 import type { User, Project, Allocation } from "@/lib/types"
 import { getCurrentUser, getCurrentUserData, getCurrentSystemUser } from "@/lib/storage"
 import { Button } from "@/components/ui/button"
+import { Navigation } from "@/components/navigation"
 import Link from "next/link"
 
 const MONTHS = [
@@ -484,76 +485,7 @@ export default function ExpenseAllocationPage() {
       `}</style>
       
       <main className="min-h-screen bg-background">
-      <nav className="bg-white border-b border-gray-200 px-6 py-3">
-        <div className="flex items-center gap-6">
-          <h1 className="text-lg font-semibold text-gray-900">Sola Allocation Tool</h1>
-          <div className="flex gap-4">
-            <Link 
-              href="/" 
-              className="text-gray-600 hover:text-gray-800 font-medium"
-            >
-              Allocation
-            </Link>
-            <Link 
-              href="/planning" 
-              className="text-gray-600 hover:text-gray-800 font-medium"
-            >
-              Planning
-            </Link>
-            <Link 
-              href="/actual-allocation" 
-              className="text-gray-600 hover:text-gray-800 font-medium"
-            >
-              Payroll Allocation
-            </Link>
-            <Link 
-              href="/expense-allocation" 
-              className="text-blue-600 hover:text-blue-800 font-medium"
-            >
-              Expense Allocation
-            </Link>
-            <Link 
-              href="/scheduled-records" 
-              className="text-gray-600 hover:text-gray-800 font-medium"
-            >
-              Scheduled Records
-            </Link>
-          </div>
-          <div className="ml-auto flex gap-2 items-center">
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(Number(e.target.value))}
-              className="border border-gray-300 rounded px-2 py-1 text-sm"
-            >
-              {MONTHS.map((month, idx) => (
-                <option key={idx} value={idx}>{month}</option>
-              ))}
-            </select>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="border border-gray-300 rounded px-2 py-1 text-sm"
-            >
-              {[2023, 2024, 2025, 2026, 2027].map(year => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
-            <Button
-              onClick={() => {
-                const user = getCurrentUser()
-                if (user) {
-                  window.location.href = "/login"
-                }
-              }}
-              variant="outline"
-              size="sm"
-            >
-              Logout
-            </Button>
-          </div>
-        </div>
-      </nav>
-
+      <Navigation currentPage="/expense-allocation" />
       <div className="p-6">
         {/* Warning Message - Only show if payroll is not locked */}
         {!isPayrollLocked && (
