@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import * as XLSX from "xlsx"
-import type { User } from "@/lib/types"
+import type { User, Project, Allocation, Position, Entity } from "@/lib/types"
 import { getCurrentUser, getCurrentUserData, getCurrentSystemUser, clearCurrentUser } from "@/lib/storage"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
