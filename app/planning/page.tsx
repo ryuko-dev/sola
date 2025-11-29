@@ -298,6 +298,18 @@ export default function PlanningPage() {
             >
               Payroll Allocation
             </Link>
+            <Link 
+              href="/expense-allocation" 
+              className="text-gray-600 hover:text-gray-800 font-medium"
+            >
+              Expense Allocation
+            </Link>
+            <Link 
+              href="/scheduled-records" 
+              className="text-gray-600 hover:text-gray-800 font-medium"
+            >
+              Scheduled Records
+            </Link>
           </div>
         </div>
       </nav>
