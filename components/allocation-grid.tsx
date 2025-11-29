@@ -8,6 +8,7 @@ import { AllocationCell } from "./allocation-cell"
 import { ProjectManager } from "./project-manager"
 import { getCurrentUser, clearCurrentUser, getCurrentUserData, setCurrentUserData, getCurrentSystemUser, getUserData, getSystemUsers } from "../lib/storage"
 import { UserManagement } from "./user-management"
+import { canEditPage, canAccessTab, UserRole } from "../lib/permissions"
 
 const MONTHS = [
   "January",
@@ -28,7 +29,7 @@ const YEARS = Array.from({ length: 10 }, (_, i) => 2024 + i)
 export function AllocationGrid() {
   // Check if user is logged in and get their role
   const [currentUser, setCurrentUserState] = useState<string | null>(null)
-  const [currentUserRole, setCurrentUserRole] = useState<'admin' | 'editor' | 'viewer' | null>(null)
+  const [currentUserRole, setCurrentUserRole] = useState<UserRole | null>(null)
   
   // Load user-specific data on component mount
   const [projects, setProjects] = useState<Project[]>(() => {
@@ -232,8 +233,8 @@ export function AllocationGrid() {
   })
 
   // Check if current user has permission for specific actions
-  const canEdit = currentUserRole === 'admin'
-  const canView = currentUserRole === 'admin' || currentUserRole === 'editor' || currentUserRole === 'viewer'
+  const canEdit = currentUserRole ? canEditPage(currentUserRole, 'allocation') : false
+  const canView = currentUserRole ? canAccessTab(currentUserRole, 'allocation') : false
 
   // Filter projects to show only those active between starting month and starting month + 11 months
   const filteredProjects = projects.filter(project => {
@@ -912,8 +913,8 @@ export function AllocationGrid() {
     <div className="space-y-4 p-6">
       <div className="flex justify-between items-start gap-4">
         <div>
-          {/* Project Management - for admins, editors, and viewers (read-only) */}
-          {(currentUserRole === 'admin' || currentUserRole === 'editor' || currentUserRole === 'viewer') && (
+          {/* Project Management - for users who can view allocation */}
+          {canView && (
             <ProjectManager
               projects={filteredProjects}
               positions={filteredProjects.flatMap((p) => p.positions || [])}
@@ -977,8 +978,8 @@ export function AllocationGrid() {
                 </button>
               </div>
             )}
-            {/* Add Staff button - only for admins and editors */}
-            {(currentUserRole === 'admin' || currentUserRole === 'editor') && (
+            {/* Add Staff button - only for users who can edit */}
+            {canEdit && (
               <Button onClick={addUser} variant="default" size="sm" className="bg-blue-900 hover:bg-blue-800 text-white">
                 + New Staff
               </Button>
@@ -1032,7 +1033,7 @@ export function AllocationGrid() {
               <div className="font-medium">{currentUser}</div>
               <div className="text-xs text-gray-500 capitalize">{currentUserRole}</div>
             </div>
-            {/* User Management button - only for admins */}
+            {/* Settings button - only for admins */}
             {currentUserRole === 'admin' && (
               <Button 
                 onClick={() => setShowUserManagement(true)} 
@@ -1211,8 +1212,8 @@ export function AllocationGrid() {
                       <td className="border border-gray-300 p-1 w-42">
                         <div className="flex items-center justify-between gap-1">
                           <span className="text-xs leading-tight">{user.name}</span>
-                          {/* Edit user button - only for admins */}
-                          {currentUserRole === 'admin' && (
+                          {/* Edit user button - only for users who can edit */}
+                          {canEdit && (
                             <button
                               onClick={() => editUser(user.id)}
                               className="text-blue-600 hover:text-blue-800 text-xs"

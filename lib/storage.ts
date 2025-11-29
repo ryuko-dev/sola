@@ -15,7 +15,7 @@ export interface SystemUser {
   email: string
   name: string
   password: string
-  role: 'admin' | 'editor' | 'viewer'
+  role: 'admin' | 'editor' | 'viewer' | 'senior'
   isActive: boolean
   createdAt: string
 }

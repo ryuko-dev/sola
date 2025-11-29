@@ -16,7 +16,7 @@ export function UserManagement({ isOpen, onClose }: UserManagementProps) {
     email: "", 
     name: "", 
     password: "",
-    role: "editor" as 'admin' | 'editor' | 'viewer' 
+    role: "editor" as 'admin' | 'editor' | 'viewer' | 'senior'
   })
   const [isAdding, setIsAdding] = useState(false)
   const [editingUser, setEditingUser] = useState<SystemUser | null>(null)
@@ -24,7 +24,7 @@ export function UserManagement({ isOpen, onClose }: UserManagementProps) {
     email: "",
     name: "",
     password: "",
-    role: "editor" as 'admin' | 'editor' | 'viewer'
+    role: "editor" as 'admin' | 'editor' | 'viewer' | 'senior'
   })
 
   // Entity management state
@@ -262,6 +262,16 @@ export function UserManagement({ isOpen, onClose }: UserManagementProps) {
           
           {showUserSection && (
             <div className="space-y-4">
+              {/* Role Permissions Guide */}
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded text-sm">
+                <h5 className="font-semibold text-blue-800 mb-2">Role Permissions Guide:</h5>
+                <div className="space-y-1 text-xs">
+                  <div><strong>Admin:</strong> Full access to all features including Settings</div>
+                  <div><strong>Senior:</strong> Can edit/delete on all pages, but cannot access Settings</div>
+                  <div><strong>Editor:</strong> Can edit Expense Allocation & Scheduled Records only, view all pages except Settings</div>
+                  <div><strong>Viewer:</strong> Can only view Allocation & Planning pages, no edit access</div>
+                </div>
+              </div>
               {/* Edit User Form */}
               {editingUser && (
                 <div className="p-4 border rounded-lg bg-blue-50 space-y-3">
@@ -289,10 +299,11 @@ export function UserManagement({ isOpen, onClose }: UserManagementProps) {
                   />
                   <select
                     value={editForm.role}
-                    onChange={(e) => setEditForm({ ...editForm, role: e.target.value as 'admin' | 'editor' | 'viewer' })}
+                    onChange={(e) => setEditForm({ ...editForm, role: e.target.value as 'admin' | 'editor' | 'viewer' | 'senior' })}
                     className="w-full px-3 py-2 border rounded text-sm"
                   >
                     <option value="admin">Admin</option>
+                    <option value="senior">Senior</option>
                     <option value="editor">Editor</option>
                     <option value="viewer">Viewer</option>
                   </select>
@@ -329,10 +340,11 @@ export function UserManagement({ isOpen, onClose }: UserManagementProps) {
                   />
                   <select
                     value={newUser.role}
-                    onChange={(e) => setNewUser({ ...newUser, role: e.target.value as 'admin' | 'editor' | 'viewer' })}
+                    onChange={(e) => setNewUser({ ...newUser, role: e.target.value as 'admin' | 'editor' | 'viewer' | 'senior' })}
                     className="w-full px-3 py-2 border rounded text-sm"
                   >
                     <option value="admin">Admin</option>
+                    <option value="senior">Senior</option>
                     <option value="editor">Editor</option>
                     <option value="viewer">Viewer</option>
                   </select>
@@ -360,6 +372,7 @@ export function UserManagement({ isOpen, onClose }: UserManagementProps) {
                       <div className="text-xs">
                         <span className={`px-2 py-1 rounded text-xs ${
                           user.role === 'admin' ? 'bg-red-100 text-red-700' :
+                          user.role === 'senior' ? 'bg-purple-100 text-purple-700' :
                           user.role === 'editor' ? 'bg-blue-100 text-blue-700' :
                           'bg-gray-100 text-gray-700'
                         }`}>

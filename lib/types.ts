@@ -38,7 +38,7 @@ export interface User {
   startDate?: string // ISO date string (YYYY-MM-DD)
   endDate?: string   // ISO date string (YYYY-MM-DD), undefined = no end date
   workDays?: 'mon-fri' | 'sun-thu' // Work week pattern, defaults to mon-fri
-  role?: 'admin' | 'editor' | 'viewer'
+  role?: 'admin' | 'editor' | 'viewer' | 'senior'
   email?: string     // For login system
   isActive?: boolean // For user management
 }
