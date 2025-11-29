@@ -83,6 +83,22 @@ export function AllocationCell({
   const totalAllocated = filteredAllocations.reduce((sum, a) => sum + (a.percentage || 0), 0)
   const freePercentage = Math.max(0, 100 - totalAllocated)
 
+  // Calculate display value based on view mode - show total for the cell
+  const totalDisplayValue = viewMode === 'days' 
+    ? Math.round(getDaysFromPercentageLocal(userId, monthIndex, totalAllocated))
+    : Math.round(totalAllocated)
+
+  const totalDisplayText = viewMode === 'days' 
+    ? `${totalDisplayValue}d`
+    : `${totalDisplayValue}%`
+
+  // Determine bar color based on total allocation
+  const barColor = totalAllocated >= 90 && totalAllocated <= 110 
+    ? '#2d7b51'  // Green for 90-110%
+    : totalAllocated < 90 
+      ? '#BB7D63' // Brown for <90%
+      : '#A82A00' // Red for >110%
+
   // Determine border class based on allocation level
   const allocationBorderClass =
     totalAllocated === 100
@@ -132,34 +148,36 @@ export function AllocationCell({
                 projectId: allocation.projectId,
                 projectColor: project?.color,
               })
-                // Keep total bar size constant: if allocations exceed 100%,
-                // normalize segments so they still fit into a 100% width bar.
-                const capacity = totalAllocated > 100 ? totalAllocated : 100
+                // Keep total bar size constant at 100%, even if allocations exceed 100%
                 const width = Math.max(
                   0,
-                  Math.min(100, ((allocation.percentage || 0) / capacity) * 100),
+                  Math.min(100, ((allocation.percentage || 0) / 100) * 100),
                 )
 
-                // Calculate display value based on view mode
-                const displayValue = viewMode === 'days' 
-                  ? Math.round(getDaysFromPercentageLocal(userId, monthIndex, allocation.percentage || 0))
-                  : Math.round(allocation.percentage || 0)
+                // Calculate display value based on view mode - show total for the cell
+                const totalDisplayValue = viewMode === 'days' 
+                  ? Math.round(getDaysFromPercentageLocal(userId, monthIndex, totalAllocated))
+                  : Math.round(totalAllocated)
 
-                const displayText = viewMode === 'days' 
-                  ? `${displayValue} days`
-                  : `${displayValue}%`
+                const totalDisplayText = viewMode === 'days' 
+                  ? `${totalDisplayValue}d`
+                  : `${totalDisplayValue}%`
 
-                // Calculate days for tooltip (always show days)
-                const daysValue = getDaysFromPercentageLocal(userId, monthIndex, allocation.percentage || 0)
+                // Determine bar color based on total allocation
+                const barColor = totalAllocated >= 90 && totalAllocated <= 110 
+                  ? '#2d7b51'  // Green for 90-110%
+                  : totalAllocated < 90 
+                    ? '#BB7D63' // Brown for <90%
+                    : '#A82A00' // Red for >110%
 
                 return (
                   <div
                     key={allocation.id}
-                    className={`h-full text-[8px] flex items-center justify-center font-semibold relative ${
+                    className={`h-full flex items-center justify-center font-semibold relative ${
                       readOnly ? "" : "group cursor-pointer"
-                    } text-white`}
+                    }`}
                     style={{
-                      backgroundColor: project?.color || "#999",
+                      backgroundColor: barColor,
                       width: `${width}%`,
                       minWidth: width > 0 ? "8%" : undefined,
                     }}
@@ -168,9 +186,8 @@ export function AllocationCell({
                       e.stopPropagation()
                       onEdit?.(allocation.id)
                     }}
-                    title={`${project?.name ?? "Project"} - ${allocation.positionName || allocation.name || "Position"} (${displayText})`}
+                    title={`${project?.name ?? "Project"} - ${allocation.positionName || allocation.name || "Position"} - ${Math.round(allocation.percentage || 0)}% (${Math.round(getDaysFromPercentageLocal(userId, monthIndex, allocation.percentage || 0))} days)`}
                   >
-                    {displayText}
                     {!readOnly && (
                       <button
                         onClick={(e) => {
@@ -187,12 +204,17 @@ export function AllocationCell({
               })
             )}
           </div>
-          {/* Green tick for 90-100% allocation */}
-          {!userEnded && !userNotStarted && totalAllocated >= 90 && totalAllocated <= 100 && filteredAllocations.length > 0 && (
-            <div className="ml-1 flex-shrink-0">
-              <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
+          
+          {/* Total text overlay - centered across filled part of bars */}
+          {filteredAllocations.length > 0 && (
+            <div 
+              className="absolute top-0 bottom-0 flex items-center justify-center pointer-events-none"
+              style={{
+                left: '0%',
+                width: `${Math.min(totalAllocated, 100)}%`
+              }}
+            >
+              <span className="text-white text-[8px] font-bold drop-shadow-md">{totalDisplayText}</span>
             </div>
           )}
         </div>

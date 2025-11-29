@@ -1566,8 +1566,8 @@ export function AllocationGrid() {
 
       {/* Month Detail Modal */}
       {showMonthDetail && selectedMonthForDetail && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-4 w-full max-w-7xl max-h-[95vh] overflow-y-auto mx-2">
+        <div className="fixed inset-0 bg-white z-50 overflow-y-auto">
+          <div className="w-full h-full p-6">
             <div className="flex justify-between items-center mb-3">
               <div>
                 <h2 className="text-base font-bold">
@@ -1612,7 +1612,7 @@ export function AllocationGrid() {
                   setShowMonthDetail(false)
                   setSelectedMonthForDetail(null)
                 }}
-                className="px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors text-xs"
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-sm font-medium"
               >
                 × Close
               </button>
@@ -1632,7 +1632,7 @@ export function AllocationGrid() {
                         {project.name}
                       </th>
                     ))}
-                    <th className="border border-gray-300 p-1 bg-gray-100 w-32 text-xs">Total</th>
+                    <th className="border border-gray-300 p-1 bg-gray-100 w-48 text-xs">Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1657,32 +1657,32 @@ export function AllocationGrid() {
                             return (
                               <td key={project.id} className="border border-gray-300 p-0.5 text-center">
                                 {projectAllocations.length > 0 ? (
-                                  <div className="flex flex-col gap-0.5">
-                                    {projectAllocations.map((allocation) => {
-                                      const position = project.positions?.find(
-                                        (p) => p.id === allocation.positionId
-                                      )
-                                      const displayValue = viewMode === 'days' 
-                                        ? getDaysFromPercentage(user.id, selectedMonthForDetail.globalIndex, allocation.percentage)
-                                        : Math.round(allocation.percentage || 0)
-                                      const displayText = viewMode === 'days' 
-                                        ? `${Math.round(displayValue)} days`
-                                        : `${displayValue}%`
-                                      
-                                      return (
-                                        <div
-                                          key={allocation.id}
-                                          className="text-[10px] px-1 py-0.5 rounded text-white leading-tight"
-                                          style={{ backgroundColor: project.color }}
-                                          title={`${position?.name || 'Position'} - ${Math.round(allocation.percentage || 0)}%`}
-                                        >
-                                          {displayText}
-                                        </div>
-                                      )
-                                    })}
-                                  </div>
+                                  projectAllocations.map((allocation) => {
+                                    const position = project.positions?.find(
+                                      (p) => p.id === allocation.positionId
+                                    )
+                                    const displayValue = viewMode === 'days' 
+                                      ? getDaysFromPercentage(user.id, selectedMonthForDetail.globalIndex, allocation.percentage)
+                                      : Math.round(allocation.percentage || 0)
+                                    const displayText = viewMode === 'days' 
+                                      ? `${Math.round(displayValue)}d`
+                                      : `${displayValue}%`
+                                    
+                                    return (
+                                      <div
+                                        key={allocation.id}
+                                        className="w-full h-4 rounded flex items-center justify-center text-white font-bold text-xs mb-1"
+                                        style={{ backgroundColor: project.color }}
+                                        title={`${position?.name || 'Position'} - ${Math.round(allocation.percentage || 0)}%`}
+                                      >
+                                        {displayText}
+                                      </div>
+                                    )
+                                  })
                                 ) : (
-                                  <div className="text-[10px] text-gray-400">-</div>
+                                  <div className="w-full h-4 rounded flex items-center justify-center text-gray-400 text-xs">
+                                    -
+                                  </div>
                                 )}
                               </td>
                             )
@@ -1696,50 +1696,24 @@ export function AllocationGrid() {
                               const roundedTotalAllocated = Math.round(totalAllocated)
                               const roundedTotalDays = Math.round(totalDays)
                               
-                              // Determine progress bar color and border
-                              let barColor = '#F59E0B' // Yellow (default for < 100%)
-                              let borderColor = 'transparent'
-                              
-                              if (roundedTotalAllocated >= 100) {
-                                if (roundedTotalAllocated > 100) {
-                                  barColor = '#10B981' // Green
-                                  borderColor = '#EF4444' // Red border for > 100%
-                                } else {
-                                  barColor = '#10B981' // Green
-                                  borderColor = 'transparent'
-                                }
-                              } else {
-                                barColor = '#F59E0B' // Yellow
-                                borderColor = 'transparent'
-                              }
+                              // Determine progress bar color based on total allocation
+                              let barColor = roundedTotalAllocated >= 90 && roundedTotalAllocated <= 110 
+                                ? '#2d7b51'  // Green for 90-110%
+                                : roundedTotalAllocated < 90 
+                                  ? '#BB7D63' // Brown for <90%
+                                  : '#A82A00' // Red for >110%
                               
                               const displayText = viewMode === 'days' 
                                 ? `${roundedTotalDays} days`
                                 : `${roundedTotalAllocated}%`
                               
                               return (
-                                <div className="w-full">
-                                  {/* Progress bar */}
-                                  <div 
-                                    className="w-full h-3 rounded relative overflow-hidden"
-                                    style={{ 
-                                      backgroundColor: '#E5E7EB',
-                                      border: borderColor !== 'transparent' ? `2px solid ${borderColor}` : 'none'
-                                    }}
-                                  >
-                                    {/* Progress bar fill - capped at 100% */}
-                                    <div
-                                      className="h-full rounded transition-all duration-300"
-                                      style={{
-                                        width: `${Math.min(totalAllocated, 100)}%`, // Cap at 100% for display
-                                        backgroundColor: barColor
-                                      }}
-                                    />
-                                    {/* Text overlay - shows actual percentage */}
-                                    <div className="absolute inset-0 flex items-center justify-center text-[9px] font-medium">
-                                      {viewMode === 'days' ? `${roundedTotalDays} days` : `${roundedTotalAllocated}%`}
-                                    </div>
-                                  </div>
+                                <div className="w-full h-4 rounded flex items-center justify-center text-white font-bold text-xs"
+                                  style={{
+                                    backgroundColor: barColor
+                                  }}
+                                >
+                                  {displayText}
                                 </div>
                               )
                             })()}

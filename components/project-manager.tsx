@@ -1,6 +1,7 @@
 "use client"
 import { useState } from "react"
 import type { Project, Position } from "../lib/types"
+import { UserRole } from "../lib/permissions"
 
 interface ProjectManagerProps {
   projects: Project[]
@@ -15,7 +16,7 @@ interface ProjectManagerProps {
   onProjectSelect?: (projectId: string | null) => void
   selectedProjectId?: string | null
   onCleanupAllocations?: (projectId: string, validPositionIds: string[]) => void
-  currentUserRole?: 'admin' | 'editor' | 'viewer' | null
+  currentUserRole?: UserRole | null
 }
 
 interface PositionBudget {
