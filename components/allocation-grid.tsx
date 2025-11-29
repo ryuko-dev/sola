@@ -1118,6 +1118,11 @@ export function AllocationGrid() {
                 <th className="border border-gray-300 bg-gray-50 w-42 text-xs text-muted-foreground">Unallocated</th>
                 {months.map((month) => {
                   const monthUnallocated = filteredProjects.flatMap((project) => {
+                    // If a project filter is active, only show unallocated positions for that project
+                    if (selectedProjectId && project.id !== selectedProjectId) {
+                      return []
+                    }
+                    
                     const positionsForMonth =
                       project.positions?.filter((pos) => pos.monthIndex === month.globalIndex) || []
 
@@ -1240,6 +1245,7 @@ export function AllocationGrid() {
                           viewMode={viewMode}
                           getDaysFromPercentage={getDaysFromPercentage}
                           readOnly={currentUserRole === 'viewer'}
+                          selectedProjectId={selectedProjectId}
                           onEdit={(id) => {
                             setEditingId(id)
                             const alloc = allocations.find((a) => a.id === id)
@@ -1369,6 +1375,11 @@ export function AllocationGrid() {
             <h3 className="text-lg font-bold mb-4">Select Position</h3>
             <div className="space-y-3">
               {projects.flatMap((project) => {
+                // If a project filter is active, only show positions for that project
+                if (selectedProjectId && project.id !== selectedProjectId) {
+                  return []
+                }
+                
                 // Positions created in ProjectManager already use a global monthIndex (0 = Jan 2024, ...)
                 // Cells in the grid also use this same global monthIndex. So we just match directly.
                 const monthPositions = (project.positions || [])

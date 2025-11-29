@@ -18,6 +18,7 @@ interface AllocationCellProps {
   viewMode?: 'percentage' | 'days'
   getDaysFromPercentage?: (userId: string, monthIndex: number, percentage: number) => number
   readOnly?: boolean
+  selectedProjectId?: string | null
 }
 
 export function AllocationCell({
@@ -35,10 +36,16 @@ export function AllocationCell({
   viewMode = 'percentage',
   getDaysFromPercentage,
   readOnly = false,
+  selectedProjectId,
 }: AllocationCellProps) {
   const [isHovering, setIsHovering] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState(0)
+
+  // Filter allocations by selected project if a filter is active
+  const filteredAllocations = selectedProjectId 
+    ? allocations.filter(allocation => allocation.projectId === selectedProjectId)
+    : allocations
 
   // Helper to convert percentage to days based on user work pattern
   const getDaysFromPercentageLocal = (userId: string, monthIndex: number, percentage: number): number => {
@@ -73,7 +80,7 @@ export function AllocationCell({
   }
 
   // Calculate total allocated percentage for this cell
-  const totalAllocated = allocations.reduce((sum, a) => sum + (a.percentage || 0), 0)
+  const totalAllocated = filteredAllocations.reduce((sum, a) => sum + (a.percentage || 0), 0)
   const freePercentage = Math.max(0, 100 - totalAllocated)
 
   // Determine border class based on allocation level
@@ -118,7 +125,7 @@ export function AllocationCell({
                 not started
               </div>
             ) : (
-              allocations.map((allocation) => {
+              filteredAllocations.map((allocation) => {
               const project = projects.find((p) => p.id === allocation.projectId)
               console.log("[v0] AllocationCell rendering bar:", {
                 allocationId: allocation.id,
@@ -181,7 +188,7 @@ export function AllocationCell({
             )}
           </div>
           {/* Green tick for 90-100% allocation */}
-          {!userEnded && !userNotStarted && totalAllocated >= 90 && totalAllocated <= 100 && allocations.length > 0 && (
+          {!userEnded && !userNotStarted && totalAllocated >= 90 && totalAllocated <= 100 && filteredAllocations.length > 0 && (
             <div className="ml-1 flex-shrink-0">
               <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
