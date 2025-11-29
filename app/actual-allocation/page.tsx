@@ -462,16 +462,16 @@ export default function ActualAllocationPage() {
   // Function to automatically populate project task based on staff allocation
   const getProjectTaskFromAllocation = (itemName: string, projectName: string, monthKey: string): string => {
     // Find the user for this allocation item
-    const user = users.find(u => u.name === itemName)
+    const user = users.find((u: User) => u.name === itemName)
     if (!user) return ''
     
     // Get the global month index for the selected month/year
     const globalMonthIndex = (selectedYear - 2024) * 12 + selectedMonth
     
     // Find allocations for this user, project, and month
-    const userAllocations = allocations.filter(a => 
+    const userAllocations = allocations.filter((a: Allocation) => 
       a.userId === user.id && 
-      a.projectId === projects.find(p => p.name === projectName)?.id &&
+      a.projectId === projects.find((p: Project) => p.name === projectName)?.id &&
       a.monthIndex === globalMonthIndex
     )
     
@@ -482,11 +482,11 @@ export default function ActualAllocationPage() {
     if (!positionName) return ''
     
     // Find the project and its positions for this month
-    const project = projects.find(p => p.name === projectName)
+    const project = projects.find((p: Project) => p.name === projectName)
     if (!project || !project.positions) return ''
     
     // Find the position for this month and get its projectTask
-    const position = project.positions.find(p => 
+    const position = project.positions.find((p: Position) => 
       p.name === positionName && 
       p.monthIndex === globalMonthIndex
     )
@@ -497,7 +497,7 @@ export default function ActualAllocationPage() {
   // Filter monthly allocation rows based on main table amounts and update currency and auto-calculate amounts
   const filteredMonthlyAllocation = React.useMemo(() => {
     const existingAllocationRows = monthlyAllocation.flatMap(item => {
-      const user = users.find(u => u.id === item.name || u.name === item.name)
+      const user = users.find((u: User) => u.id === item.name || u.name === item.name)
       if (!user) return []
       
       const monthKey = `${selectedYear}-${selectedMonth}`
@@ -566,7 +566,7 @@ export default function ActualAllocationPage() {
       
       return projectRows
     }).filter(item => {
-      const user = users.find(u => u.id === item.name || u.name === item.name)
+      const user = users.find((u: User) => u.id === item.name || u.name === item.name)
       if (!user) return false
       
       const monthKey = `${selectedYear}-${selectedMonth}`
@@ -630,7 +630,7 @@ export default function ActualAllocationPage() {
       const monthKey = `${selectedYear}-${selectedMonth}`
       
       // Find the entity configuration to get account codes
-      const entityConfig = entities.find(e => e.name === entity)
+      const entityConfig = entities.find((e: Entity) => e.name === entity)
       const taxAccountCode = entityConfig?.taxAccount || ''
       const ssAccountCode = entityConfig?.ssAccount || ''
       
