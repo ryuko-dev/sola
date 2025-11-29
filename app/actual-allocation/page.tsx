@@ -4,7 +4,7 @@ import * as React from "react"
 import * as XLSX from "xlsx"
 import type { User, Project, Allocation, Position, Entity } from "@/lib/types"
 import { getCurrentUser, getCurrentUserData, getCurrentSystemUser, getSystemUsers, getUserData } from "@/lib/storage"
-import { canEditPage, canAccessTab, UserRole } from "@/lib/permissions"
+import { canEditPage, canAccessTab, UserRole, canLockPayroll } from "@/lib/permissions"
 import { getSharedMonthYear, setSharedMonthYear } from "@/lib/shared-state"
 import { Button } from "@/components/ui/button"
 import { Navigation } from "@/components/navigation"
@@ -184,15 +184,15 @@ export default function ActualAllocationPage() {
     setUsers(usersWithPayroll)
   }, [])
 
-  // Check if current user is admin
-  const isAdmin = () => {
+  // Check if current user can lock payroll
+  const canLock = () => {
     const systemUser = getCurrentSystemUser()
-    return systemUser?.role === 'admin'
+    return systemUser ? canLockPayroll(systemUser.role) : false
   }
 
-  // Toggle lock state (admin only)
+  // Toggle lock state (admin or senior only)
   const toggleLock = () => {
-    if (!isAdmin()) return
+    if (!canLock()) return
     
     const newLockState = !isLocked
     setIsLocked(newLockState)
@@ -831,7 +831,7 @@ export default function ActualAllocationPage() {
           
           {/* Lock and View Controls */}
           <div className="flex gap-2 items-center">
-            {isClient && isAdmin() && (
+            {isClient && canLock() && (
               <Button
                 onClick={toggleLock}
                 variant={isLocked ? "destructive" : "outline"}

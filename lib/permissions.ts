@@ -90,10 +90,17 @@ export function canAccessTab(role: UserRole, tab: keyof TabPermissions): boolean
 }
 
 /**
- * Check if user can edit on a specific page
+ * Check if user can edit a specific page
  */
 export function canEditPage(role: UserRole, page: keyof Omit<TabPermissions, 'settings'>): boolean {
   return getPermissions(role, page).canEdit
+}
+
+/**
+ * Check if user can lock/unlock payroll allocation
+ */
+export function canLockPayroll(role: UserRole): boolean {
+  return role === 'admin' || role === 'senior'
 }
 
 /**
