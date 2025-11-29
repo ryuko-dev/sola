@@ -549,6 +549,53 @@ export default function ExpenseAllocationPage() {
 
         <div className="flex justify-between items-center mb-6 no-print">
           <h2 className="text-xl font-semibold text-gray-800">Expense Allocation</h2>
+          <div className="flex gap-3 items-center">
+            {/* Month/Year Selectors */}
+            <div className="flex gap-2 items-center">
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                className="border border-gray-300 rounded px-2 py-1 text-sm"
+              >
+                {MONTHS.map((month, idx) => (
+                  <option key={idx} value={idx}>{month}</option>
+                ))}
+              </select>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                className="border border-gray-300 rounded px-2 py-1 text-sm"
+              >
+                {[2023, 2024, 2025, 2026, 2027].map(year => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+            </div>
+            
+            {/* Lock Status and Logout */}
+            <div className="flex gap-2 items-center">
+              {isPayrollLocked && (
+                <div className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                  </svg>
+                  Locked
+                </div>
+              )}
+              <Button
+                onClick={() => {
+                  const user = getCurrentUser()
+                  if (user) {
+                    window.location.href = "/login"
+                  }
+                }}
+                variant="outline"
+                size="sm"
+              >
+                Logout
+              </Button>
+            </div>
+          </div>
         </div>
 
         {uniqueProjects.length === 0 ? (
