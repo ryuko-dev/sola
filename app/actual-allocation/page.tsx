@@ -789,8 +789,35 @@ export default function ActualAllocationPage() {
     <main className="min-h-screen bg-background">
       <Navigation currentPage="/actual-allocation" />
       <div className="space-y-4 p-6">
-        <div className="flex justify-between items-center gap-4">
-          <div>
+      </div>
+
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-semibold text-gray-800">Payroll Allocation</h2>
+        <div className="flex gap-3 items-center">
+          {/* Month/Year Selectors */}
+          <div className="flex gap-2 items-center">
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(Number(e.target.value))}
+              className="border border-gray-300 rounded px-2 py-1 text-sm"
+            >
+              {MONTHS.map((month, idx) => (
+                <option key={idx} value={idx}>{month}</option>
+              ))}
+            </select>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className="border border-gray-300 rounded px-2 py-1 text-sm"
+            >
+              {[2023, 2024, 2025, 2026, 2027].map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
+          
+          {/* Lock and View Controls */}
+          <div className="flex gap-2 items-center">
             {isClient && isAdmin() && (
               <Button
                 onClick={toggleLock}
@@ -811,24 +838,14 @@ export default function ActualAllocationPage() {
                 {showPercentage ? "🔢 Values" : "📊 % View"}
               </Button>
             )}
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(Number(e.target.value))}
-              className="border border-gray-300 rounded px-2 py-1 text-sm"
+            <Button
+              onClick={exportMainTable}
+              variant="outline"
+              size="sm"
+              className="font-medium"
             >
-              {MONTHS.map((month, idx) => (
-                <option key={idx} value={idx}>{month}</option>
-              ))}
-            </select>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="border border-gray-300 rounded px-2 py-1 text-sm"
-            >
-              {[2023, 2024, 2025, 2026, 2027].map(year => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
+              📊 Export
+            </Button>
             <Button
               onClick={() => {
                 const user = getCurrentUser()
@@ -844,18 +861,6 @@ export default function ActualAllocationPage() {
             </Button>
           </div>
         </div>
-      </div>
-
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold text-gray-800">Payroll Allocation</h2>
-        <Button
-          onClick={exportMainTable}
-          variant="outline"
-          size="sm"
-          className="font-medium"
-        >
-          📊 Export to Excel
-        </Button>
       </div>
 
       <div className="overflow-x-auto">
