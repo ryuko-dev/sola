@@ -4,6 +4,7 @@ import * as React from "react"
 import type { User, Project, Allocation } from "@/lib/types"
 import { getCurrentUser, getCurrentUserData, getCurrentSystemUser } from "@/lib/storage"
 import { canEditPage, UserRole } from "@/lib/permissions"
+import { getSharedMonthYear, setSharedMonthYear } from "@/lib/shared-state"
 import { Button } from "@/components/ui/button"
 import { Navigation } from "@/components/navigation"
 import Link from "next/link"
@@ -25,30 +26,28 @@ interface ExpenseAllocationRow {
 export default function ExpenseAllocationPage() {
   const [currentUser, setCurrentUser] = React.useState<string | null>(null)
   const [currentUserRole, setCurrentUserRole] = React.useState<UserRole | null>(null)
-  const [selectedMonth, setSelectedMonth] = React.useState<number>(() => {
-    // Load saved month from localStorage or use current month
-    if (typeof window !== 'undefined') {
-      const savedMonth = localStorage.getItem('sola-selected-month')
-      return savedMonth !== null ? parseInt(savedMonth) : new Date().getMonth()
-    }
-    return new Date().getMonth()
-  })
-  const [selectedYear, setSelectedYear] = React.useState<number>(() => {
-    // Load saved year from localStorage or use current year
-    if (typeof window !== 'undefined') {
-      const savedYear = localStorage.getItem('sola-selected-year')
-      return savedYear !== null ? parseInt(savedYear) : new Date().getFullYear()
-    }
-    return new Date().getFullYear()
-  })
-  const [isClient, setIsClient] = React.useState<boolean>(false)
+  
+  // Initialize with shared month/year state
+  const sharedState = getSharedMonthYear()
+  const [selectedMonth, setSelectedMonth] = React.useState<number>(sharedState.month)
+  const [selectedYear, setSelectedYear] = React.useState<number>(sharedState.year)
+  
   const [users, setUsers] = React.useState<User[]>([])
   const [projects, setProjects] = React.useState<Project[]>([])
   const [allocations, setAllocations] = React.useState<Allocation[]>([])
   const [expenseRows, setExpenseRows] = React.useState<ExpenseAllocationRow[]>([])
   const [selectedEntity, setSelectedEntity] = React.useState<string | null>(null)
   const [showEntityUsers, setShowEntityUsers] = React.useState<boolean>(false)
-  const [descriptionFilter, setDescriptionFilter] = React.useState<string>('')
+  const [descriptionFilter, setDescriptionFilter] = React.useState<string>("")
+  const [isPayrollLocked, setIsPayrollLocked] = React.useState<boolean>(false)
+  const [isClient, setIsClient] = React.useState<boolean>(false)
+
+  // Update shared state when month/year changes
+  const updateMonthYear = React.useCallback((month: number, year: number) => {
+    setSelectedMonth(month)
+    setSelectedYear(year)
+    setSharedMonthYear(month, year)
+  }, [])
 
   // Save month/year to localStorage when they change
   React.useEffect(() => {
@@ -317,7 +316,6 @@ export default function ExpenseAllocationPage() {
   }, [entityProjectAllocations, selectedEntity])
 
   // Check if payroll allocation is locked for the selected month
-  const [isPayrollLocked, setIsPayrollLocked] = React.useState(false)
 
   // Update lock state when month changes or on storage events
   React.useEffect(() => {
@@ -554,7 +552,7 @@ export default function ExpenseAllocationPage() {
             <div className="flex gap-2 items-center">
               <select
                 value={selectedMonth}
-                onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                onChange={(e) => updateMonthYear(Number(e.target.value), selectedYear)}
                 className="border border-gray-300 rounded px-2 py-1 text-sm"
               >
                 {MONTHS.map((month, idx) => (
@@ -563,7 +561,7 @@ export default function ExpenseAllocationPage() {
               </select>
               <select
                 value={selectedYear}
-                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                onChange={(e) => updateMonthYear(selectedMonth, Number(e.target.value))}
                 className="border border-gray-300 rounded px-2 py-1 text-sm"
               >
                 {[2023, 2024, 2025, 2026, 2027].map(year => (

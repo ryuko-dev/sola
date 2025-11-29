@@ -3,7 +3,9 @@
 import * as React from "react"
 import * as XLSX from "xlsx"
 import type { User, Project, Allocation, Position, Entity } from "@/lib/types"
-import { getCurrentUser, getCurrentUserData, getCurrentSystemUser, clearCurrentUser } from "@/lib/storage"
+import { getCurrentUser, getCurrentUserData, getCurrentSystemUser, getSystemUsers, getUserData } from "@/lib/storage"
+import { canEditPage, canAccessTab, UserRole } from "@/lib/permissions"
+import { getSharedMonthYear, setSharedMonthYear } from "@/lib/shared-state"
 import { Button } from "@/components/ui/button"
 import { Navigation } from "@/components/navigation"
 
@@ -55,12 +57,23 @@ export default function ActualAllocationPage() {
   const [projects, setProjects] = React.useState<any[]>([])
   const [entities, setEntities] = React.useState<any[]>([])
   const [allocations, setAllocations] = React.useState<any[]>([]) // Load staff allocations
-  const [selectedMonth, setSelectedMonth] = React.useState<number>(new Date().getMonth())
-  const [selectedYear, setSelectedYear] = React.useState<number>(new Date().getFullYear())
+  
+  // Initialize with shared month/year state
+  const sharedState = getSharedMonthYear()
+  const [selectedMonth, setSelectedMonth] = React.useState<number>(sharedState.month)
+  const [selectedYear, setSelectedYear] = React.useState<number>(sharedState.year)
+  
   const [isLocked, setIsLocked] = React.useState<boolean>(false)
   const [monthlyAllocation, setMonthlyAllocation] = React.useState<MonthlyAllocationItem[]>([])
   const [showPercentage, setShowPercentage] = React.useState<boolean>(false)
   const [isClient, setIsClient] = React.useState<boolean>(false)
+
+  // Update shared state when month/year changes
+  const updateMonthYear = React.useCallback((month: number, year: number) => {
+    setSelectedMonth(month)
+    setSelectedYear(year)
+    setSharedMonthYear(month, year)
+  }, [])
 
   // Handle client-side hydration
   React.useEffect(() => {
@@ -798,7 +811,7 @@ export default function ActualAllocationPage() {
           <div className="flex gap-2 items-center">
             <select
               value={selectedMonth}
-              onChange={(e) => setSelectedMonth(Number(e.target.value))}
+              onChange={(e) => updateMonthYear(Number(e.target.value), selectedYear)}
               className="border border-gray-300 rounded px-2 py-1 text-sm"
             >
               {MONTHS.map((month, idx) => (
@@ -807,7 +820,7 @@ export default function ActualAllocationPage() {
             </select>
             <select
               value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              onChange={(e) => updateMonthYear(selectedMonth, Number(e.target.value))}
               className="border border-gray-300 rounded px-2 py-1 text-sm"
             >
               {[2023, 2024, 2025, 2026, 2027].map(year => (

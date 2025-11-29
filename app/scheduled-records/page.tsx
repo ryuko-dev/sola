@@ -4,6 +4,7 @@ import * as React from "react"
 import { Navigation } from "@/components/navigation"
 import { canEditPage, UserRole } from "@/lib/permissions"
 import { getCurrentSystemUser } from "@/lib/storage"
+import { getSharedMonthYear, setSharedMonthYear } from "@/lib/shared-state"
 import { Button } from "@/components/ui/button"
 
 const MONTHS = [
@@ -27,22 +28,12 @@ interface ScheduledRecord {
 
 export default function ScheduledRecordsPage() {
   const [currentUserRole, setCurrentUserRole] = React.useState<UserRole | null>(null)
-  const [selectedMonth, setSelectedMonth] = React.useState<number>(() => {
-    // Load saved month from localStorage or use current month
-    if (typeof window !== 'undefined') {
-      const savedMonth = localStorage.getItem('sola-selected-month')
-      return savedMonth !== null ? parseInt(savedMonth) : new Date().getMonth()
-    }
-    return new Date().getMonth()
-  })
-  const [selectedYear, setSelectedYear] = React.useState<number>(() => {
-    // Load saved year from localStorage or use current year
-    if (typeof window !== 'undefined') {
-      const savedYear = localStorage.getItem('sola-selected-year')
-      return savedYear !== null ? parseInt(savedYear) : new Date().getFullYear()
-    }
-    return new Date().getFullYear()
-  })
+  
+  // Initialize with shared month/year state
+  const sharedState = getSharedMonthYear()
+  const [selectedMonth, setSelectedMonth] = React.useState<number>(sharedState.month)
+  const [selectedYear, setSelectedYear] = React.useState<number>(sharedState.year)
+  
   const [selectedEntity, setSelectedEntity] = React.useState<string | null>(null)
   const [showEntityUsers, setShowEntityUsers] = React.useState<boolean>(false)
   const [descriptionFilter, setDescriptionFilter] = React.useState<string>('')
@@ -65,6 +56,13 @@ export default function ScheduledRecordsPage() {
 })
   const [tableRecords, setTableRecords] = React.useState<Record<string, ScheduledRecord[]>>({})
   const [isClient, setIsClient] = React.useState<boolean>(false)
+
+  // Update shared state when month/year changes
+  const updateMonthYear = React.useCallback((month: number, year: number) => {
+    setSelectedMonth(month)
+    setSelectedYear(year)
+    setSharedMonthYear(month, year)
+  }, [])
 
   // Save month/year to localStorage when they change
   React.useEffect(() => {
@@ -753,7 +751,7 @@ export default function ScheduledRecordsPage() {
             <label className="block text-xs font-medium">Start Month</label>
             <select
               value={selectedMonth}
-              onChange={(e) => setSelectedMonth(Number(e.target.value))}
+              onChange={(e) => updateMonthYear(Number(e.target.value), selectedYear)}
               className="border border-gray-300 rounded px-2 py-1 text-sm"
             >
               {MONTHS.map((month, idx) => (
@@ -762,7 +760,7 @@ export default function ScheduledRecordsPage() {
             </select>
             <select
               value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              onChange={(e) => updateMonthYear(selectedMonth, Number(e.target.value))}
               className="border border-gray-300 rounded px-2 py-1 text-sm"
             >
               {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i).map((year: number) => (
