@@ -71,6 +71,18 @@ export default function ActualAllocationPage() {
   const [monthlyAllocation, setMonthlyAllocation] = React.useState<MonthlyAllocationItem[]>([])
   const [showPercentage, setShowPercentage] = React.useState<boolean>(false)
   const [isClient, setIsClient] = React.useState<boolean>(false)
+  const [canLockPermission, setCanLockPermission] = React.useState<boolean>(false)
+
+  // Check lock permission on mount and when user changes
+  React.useEffect(() => {
+    const checkLockPermission = async () => {
+      const permission = await canLock()
+      setCanLockPermission(permission)
+    }
+    if (isClient) {
+      checkLockPermission()
+    }
+  }, [isClient, currentUser])
 
   // Update shared state when month/year changes
   const updateMonthYear = React.useCallback((month: number, year: number) => {
@@ -139,6 +151,10 @@ export default function ActualAllocationPage() {
               userName: user.name,
               accountCode: category.code,
               accountName: category.name,
+              description: `${user.name} - ${category.name}`,
+              project: '',
+              projectTask: '',
+              account: `${category.name} [${category.code}]`,
               amount: 0,
               currency: "USD"
             })
@@ -381,18 +397,20 @@ export default function ActualAllocationPage() {
         return user
       })
       
-      // Save to localStorage
-      const userData = await getCurrentUserData()
-      const updatedUserData = {
-        ...userData,
-        users: updatedUsers.map(user => ({
-          ...user,
-          payrollDataByMonth: user.payrollDataByMonth,
-          fringeDataByMonth: user.fringeDataByMonth,
-          projectDataByMonth: user.projectDataByMonth
-        }))
-      }
-      setCurrentUserData(updatedUserData)
+      // Save to localStorage asynchronously
+      ;(async () => {
+        const userData = await getCurrentUserData()
+        const updatedUserData = {
+          ...userData,
+          users: updatedUsers.map(user => ({
+            ...user,
+            payrollDataByMonth: user.payrollDataByMonth,
+            fringeDataByMonth: user.fringeDataByMonth,
+            projectDataByMonth: user.projectDataByMonth
+          }))
+        }
+        setCurrentUserData(updatedUserData)
+      })()
       
       return updatedUsers
     })
@@ -569,7 +587,7 @@ export default function ActualAllocationPage() {
               currency: payrollData?.currency || 'USD',
               amount: parseFloat(calculatedAmount.toFixed(2)),
               project: project.name,
-              projectTask: getProjectTaskFromAllocation(item.name, project.name, monthKey)
+              projectTask: getProjectTaskFromAllocation(item.name || item.userName || '', project.name, monthKey)
             })
           }
         })
@@ -829,7 +847,7 @@ export default function ActualAllocationPage() {
           
           {/* Lock and View Controls */}
           <div className="flex gap-2 items-center">
-            {isClient && canLock() && (
+            {isClient && canLockPermission && (
               <Button
                 onClick={toggleLock}
                 variant={isLocked ? "destructive" : "outline"}
