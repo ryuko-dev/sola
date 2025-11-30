@@ -8,18 +8,21 @@ const azureConfig = {
   tableName: process.env.AZURE_TABLE_NAME || "soladata"
 }
 
-// Create TableServiceClient
-const tableService = new TableServiceClient(
+// Check if Azure is properly configured
+const isAzureConfigured = azureConfig.accountKey && azureConfig.accountKey.trim() !== ""
+
+// Create TableServiceClient only if Azure is configured
+const tableService = isAzureConfigured ? new TableServiceClient(
   `https://${azureConfig.accountName}.table.core.windows.net`,
   new AzureSASCredential(azureConfig.accountKey)
-)
+) : null
 
-// Create TableClient for our data
-const tableClient = new TableClient(
+// Create TableClient for our data only if Azure is configured
+const tableClient = isAzureConfigured ? new TableClient(
   `https://${azureConfig.accountName}.table.core.windows.net`,
   azureConfig.tableName,
   new AzureSASCredential(azureConfig.accountKey)
-)
+) : null
 
 // System user interface
 export interface SystemUser {
@@ -65,6 +68,11 @@ export class AzureStorage {
 
   // Initialize table
   async initializeTable(): Promise<void> {
+    if (!tableService) {
+      console.log('[Azure] Azure not configured, skipping table initialization')
+      return
+    }
+    
     try {
       await tableService.createTable(azureConfig.tableName)
       console.log('[Azure] Table created successfully')
@@ -80,6 +88,11 @@ export class AzureStorage {
 
   // Get global data from Azure Table
   async getGlobalData(): Promise<GlobalData> {
+    if (!tableClient) {
+      console.log('[Azure] Azure not configured, throwing error to use fallback')
+      throw new Error('Azure not configured')
+    }
+    
     try {
       const entities = tableClient.listEntities<TableEntity>({
         queryOptions: { filter: `partitionKey eq 'globaldata'` }
@@ -117,6 +130,11 @@ export class AzureStorage {
 
   // Set global data to Azure Table
   async setGlobalData(data: Partial<GlobalData>): Promise<void> {
+    if (!tableClient) {
+      console.log('[Azure] Azure not configured, throwing error to use fallback')
+      throw new Error('Azure not configured')
+    }
+    
     try {
       const existing = await this.getGlobalData()
       const updated = { ...existing, ...data }
@@ -141,6 +159,11 @@ export class AzureStorage {
 
   // Listen for real-time changes (polling approach for Table API)
   onDataChange(callback: (data: GlobalData) => void): () => void {
+    if (!tableClient) {
+      console.log('[Azure] Azure not configured, skipping real-time updates')
+      return () => {} // Return no-op cleanup function
+    }
+    
     let lastETag: string | undefined
     
     const poll = async () => {
@@ -170,6 +193,11 @@ export class AzureStorage {
 
   // Clear all data
   async clearGlobalData(): Promise<void> {
+    if (!tableClient) {
+      console.log('[Azure] Azure not configured, skipping data clear')
+      return
+    }
+    
     try {
       await tableClient.deleteEntity('globaldata', 'main')
       console.log('[Azure] Data cleared successfully')
